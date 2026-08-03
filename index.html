@@ -1,0 +1,2366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Análise Biomecânica · Tênis · v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --quadra:#0D1B2A;
+    --painel:#13263A;
+    --painel-2:#1A3350;
+    --linha:#2A4A6B;
+    --giz:#F2F6FA;
+    --giz-2:#8FA7BE;
+    --bola:#D8F000;
+    --alerta:#FF5A5A;
+    --ciano:#4FD8EB;
+    --raio:10px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--quadra);color:var(--giz);
+    font-family:'Inter',system-ui,sans-serif;
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+
+  header{
+    display:flex;align-items:center;gap:14px;
+    padding:10px 18px;border-bottom:1px solid var(--linha);flex:0 0 auto;
+  }
+  .marca{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.35rem;letter-spacing:.06em;text-transform:uppercase}
+  .marca b{color:var(--bola)}
+  .sessao{font-size:.78rem;color:var(--giz-2);border-left:1px solid var(--linha);padding-left:14px;max-width:26ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  header .direita{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+  main{flex:1;display:flex;min-height:0}
+
+  .ferramentas{
+    flex:0 0 74px;display:flex;flex-direction:column;align-items:center;
+    gap:6px;padding:12px 8px;border-right:1px solid var(--linha);overflow-y:auto;
+  }
+  .ferramentas .rotulo{
+    font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:.68rem;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--giz-2);margin:8px 0 2px;
+  }
+  .btn-fer{
+    width:54px;height:48px;border:1px solid var(--linha);
+    background:var(--painel);color:var(--giz);border-radius:var(--raio);
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;font-size:.6rem;font-weight:500;transition:background .15s,border-color .15s;
+  }
+  .btn-fer svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .btn-fer:hover{background:var(--painel-2)}
+  .btn-fer.ativo{border-color:var(--bola);color:var(--bola);background:var(--painel-2)}
+  .btn-fer:focus-visible{outline:2px solid var(--bola);outline-offset:2px}
+
+  .cores{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:54px}
+  .cor{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+  .cor.ativa{border-color:var(--giz);box-shadow:0 0 0 2px var(--quadra),0 0 0 4px var(--bola)}
+  .cor:focus-visible{outline:2px solid var(--bola);outline-offset:2px}
+
+  .palco-envoltorio{flex:1;display:flex;flex-direction:column;min-width:0}
+  .mini-range{flex:none !important;width:72px;height:5px !important}
+
+  .palco{flex:1;position:relative;background:#000;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden}
+  .zoom-wrap{position:relative;line-height:0;transition:transform .18s ease-out;max-width:100%;max-height:100%;display:flex;align-items:center;justify-content:center}
+  .zoom-chip{
+    position:absolute;top:14px;left:14px;z-index:7;
+    background:rgba(13,27,42,.85);border:1px solid var(--bola);color:var(--bola);
+    padding:5px 12px;border-radius:999px;font-size:.78rem;font-weight:600;display:none;
+  }
+  .zoom-chip.visivel{display:block}
+  video{max-width:100%;max-height:100%;display:block}
+  .tela-anot{position:absolute;cursor:crosshair;touch-action:none}
+  .tela-anot.modo-mao{cursor:default}
+
+  .webcam-pip{
+    position:absolute;z-index:8;
+    /* largura/altura/posição são definidas via JS (posicionarWebcamPip),
+       sempre como fração do próprio vídeo — garante que o tamanho na
+       gravação final seja IGUAL ao que aparece ao vivo */
+    border-radius:0 0 0 12px;border:2px solid var(--bola);border-top:none;border-right:none;
+    box-shadow:0 6px 20px rgba(0,0,0,.5);
+    object-fit:cover;background:#000;
+    transform:scaleX(-1); /* espelha só na pré-visualização, como um espelho */
+  }
+
+  .envio{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;
+    border:2px dashed var(--linha);margin:24px;border-radius:16px;
+    color:var(--giz-2);text-align:center;padding:20px;z-index:5;background:var(--quadra);
+  }
+  .envio.arrastando{border-color:var(--bola);color:var(--bola)}
+  .envio h2{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:1.5rem;letter-spacing:.04em;color:var(--giz)}
+  .btn-primario{
+    background:var(--bola);color:#10200A;border:none;border-radius:999px;
+    font-weight:600;font-size:.9rem;padding:11px 26px;cursor:pointer;
+  }
+  .btn-primario:hover{filter:brightness(1.08)}
+  .btn-primario:focus-visible{outline:2px solid var(--giz);outline-offset:2px}
+
+  .dica-flutuante{
+    position:absolute;top:14px;left:50%;transform:translateX(-50%);
+    background:rgba(13,27,42,.85);border:1px solid var(--linha);
+    padding:6px 16px;border-radius:999px;font-size:.78rem;color:var(--bola);
+    pointer-events:none;opacity:0;transition:opacity .2s;backdrop-filter:blur(4px);z-index:6;
+    max-width:90%;text-align:center;
+  }
+  .dica-flutuante.visivel{opacity:1}
+
+  .controles{
+    flex:0 0 auto;border-top:1px solid var(--linha);
+    padding:10px 16px 12px;display:flex;flex-direction:column;gap:8px;background:var(--painel);
+  }
+  .linha-tempo{display:flex;align-items:center;gap:12px}
+  .tempo{
+    font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:1.05rem;
+    letter-spacing:.05em;min-width:118px;color:var(--bola);font-variant-numeric:tabular-nums;
+  }
+  .tempo-mini{min-width:168px;font-size:.86rem}
+  input[type=range]{
+    flex:1;appearance:none;height:6px;border-radius:3px;
+    background:linear-gradient(to right,var(--bola) var(--prog,0%),var(--linha) var(--prog,0%));cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{appearance:none;width:16px;height:16px;border-radius:50%;background:var(--bola);border:2px solid var(--quadra)}
+  input[type=range]:focus-visible{outline:2px solid var(--bola);outline-offset:4px}
+
+  .linha-botoes{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .btn{
+    background:var(--quadra);border:1px solid var(--linha);color:var(--giz);
+    border-radius:var(--raio);padding:8px 12px;cursor:pointer;font-size:.8rem;
+    font-weight:500;display:flex;align-items:center;gap:6px;transition:background .15s;
+  }
+  .btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .btn:hover{background:var(--painel-2)}
+  .btn:focus-visible{outline:2px solid var(--bola);outline-offset:2px}
+  .btn.ativo{border-color:var(--bola);color:var(--bola)}
+  #btnPlay{width:52px;height:44px;justify-content:center;background:var(--bola);color:#10200A;border:none}
+  #btnPlay svg{width:20px;height:20px;fill:currentColor;stroke:none}
+  #btnPlay:hover{filter:brightness(1.08);background:var(--bola)}
+  .separador{width:1px;height:26px;background:var(--linha);margin:0 4px}
+  .grupo-velocidade{display:flex;gap:4px;align-items:center}
+  .grupo-velocidade .rotulo-vel{
+    font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:.72rem;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--giz-2);margin-right:2px;
+  }
+  .btn-vel{padding:7px 10px;font-variant-numeric:tabular-nums}
+  .atalhos{margin-left:auto;font-size:.7rem;color:var(--giz-2);text-align:right;line-height:1.5}
+  .atalhos kbd{background:var(--quadra);border:1px solid var(--linha);border-radius:4px;padding:1px 5px;font-family:inherit;font-size:.68rem}
+
+  /* Gravação */
+  #btnGravar{border-color:var(--alerta)}
+  #btnGravar .ponto{width:10px;height:10px;border-radius:50%;background:var(--alerta);display:inline-block}
+  #btnGravar.gravando{background:var(--alerta);color:#fff;border-color:var(--alerta)}
+  #btnGravar.gravando .ponto{background:#fff;animation:pulsar 1.1s infinite}
+  @keyframes pulsar{50%{opacity:.25}}
+  .tempo-rec{font-variant-numeric:tabular-nums;font-size:.78rem;color:var(--alerta);min-width:52px}
+  .aviso-download{
+    position:fixed;bottom:90px;right:18px;background:var(--painel-2);
+    border:1px solid var(--bola);border-radius:var(--raio);padding:12px 16px;
+    font-size:.8rem;max-width:300px;z-index:20;display:none;
+  }
+  .aviso-download.visivel{display:block}
+  .aviso-download a{color:var(--bola)}
+
+  .caixa-texto-edicao{
+    position:fixed;z-index:60;min-width:160px;max-width:360px;min-height:36px;
+    padding:7px 9px;border-radius:8px;border:2px solid var(--bola);
+    background:rgba(13,27,42,.94);font-family:'Barlow Condensed',sans-serif;
+    font-size:1.15rem;font-weight:600;line-height:1.3;resize:both;outline:none;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);
+  }
+  .caixa-texto-edicao::placeholder{color:var(--giz-2);font-weight:500}
+
+  body.limpo .ferramentas,body.limpo header{display:none}
+  body.limpo .controles{background:rgba(19,38,58,.92);backdrop-filter:blur(6px)}
+
+  /* Modo 2 câmeras */
+  .duo-palco{flex:1;display:flex;gap:2px;min-height:0;background:#000;position:relative;overflow:hidden}
+  .duo-coluna{display:flex;flex-direction:column;flex:1 1 50%;min-width:0;min-height:0}
+  .duo-coluna + .duo-coluna{border-left:1px solid var(--linha)}
+  .duo-cam{position:relative;flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000}
+  .duo-tempo-individual{
+    flex:0 0 auto;display:flex;align-items:center;gap:8px;
+    padding:6px 12px;background:var(--painel);border-top:1px solid var(--linha);
+  }
+  .duo-cam-rotulo{
+    position:absolute;top:8px;left:8px;z-index:6;
+    background:rgba(13,27,42,.85);border:1px solid var(--linha);color:var(--giz-2);
+    font-family:'Barlow Condensed',sans-serif;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+    font-size:.68rem;padding:4px 10px;border-radius:999px;pointer-events:none;
+  }
+  .duo-cam-trocar{
+    position:absolute;top:8px;right:8px;z-index:6;width:30px;height:30px;border-radius:50%;
+    border:1px solid var(--linha);background:rgba(13,27,42,.85);color:var(--giz);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .duo-cam-trocar:hover{background:var(--painel-2)}
+  .duo-cam-trocar svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .duo-cam-passo{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);z-index:6;display:flex;gap:4px}
+  .duo-cam-passo button{
+    min-width:34px;height:26px;padding:0 8px;border-radius:6px;border:1px solid var(--linha);
+    background:rgba(13,27,42,.85);color:var(--giz);cursor:pointer;font-size:.72rem;font-weight:500;
+    display:flex;align-items:center;justify-content:center;gap:3px;
+  }
+  .duo-cam-passo button:hover{background:var(--painel-2)}
+  .duo-cam-passo svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  .duo-cam .envio{margin:12px}
+  .duo-cam .envio h2{font-size:1.1rem}
+  .duo-cam .envio p{font-size:.76rem}
+  #grupoDefasagem .tempo{font-size:.85rem;min-width:64px;text-align:center}
+  @media (max-width:900px){
+    .duo-palco{flex-direction:column}
+    .duo-coluna + .duo-coluna{border-left:none;border-top:1px solid var(--linha)}
+  }
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  @media (max-width:760px){
+    .ferramentas{flex-basis:64px}
+    .atalhos{display:none}
+    .tempo{min-width:90px;font-size:.9rem}
+    .sessao{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="marca">Biomec<b>·</b>Tênis</div>
+  <div class="sessao" id="nomeArquivo">Nenhum vídeo carregado</div>
+  <div class="direita">
+    <span class="tempo-rec" id="tempoRec"></span>
+    <button class="btn" id="btnModo2Cam" title="Comparar duas câmeras do mesmo golpe lado a lado">
+      <svg viewBox="0 0 24 24"><rect x="2" y="5" width="9" height="14" rx="1.5"/><rect x="13" y="5" width="9" height="14" rx="1.5"/></svg>
+      <span id="txtModo2Cam">2 câmeras</span>
+    </button>
+    <button class="btn" id="btnWebcam" title="Mostrar sua webcam sobreposta ao vídeo (aparece também na gravação)">
+      <svg viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2.5"/><path d="M16 9.5l6-3.5v12l-6-3.5z"/></svg>
+      <span id="txtWebcam">Webcam</span>
+    </button>
+    <button class="btn" id="btnPasta" title="Escolher a pasta onde as gravações serão salvas">
+      <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+      <span id="txtPasta">Pasta de destino</span>
+    </button>
+    <button class="btn" id="btnGravar" title="Gravar análise com narração (R)">
+      <span class="ponto"></span><span id="txtGravar">Gravar análise</span>
+    </button>
+    <button class="btn" id="btnTrocarVideo" title="Carregar outro vídeo">
+      <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+      Trocar vídeo
+    </button>
+    <button class="btn" id="btnTelaCheia" title="Tela cheia (F)">
+      <svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+      Tela cheia
+    </button>
+  </div>
+</header>
+
+<main>
+  <nav class="ferramentas" aria-label="Ferramentas de anotação">
+    <span class="rotulo">Ferramenta</span>
+    <button class="btn-fer ativo" data-fer="mao" title="Mover: sem desenhar; clique numa marcação pra selecionar e arrastar/ajustar (V)">
+      <svg viewBox="0 0 24 24"><path d="M7 11V6a1.5 1.5 0 0 1 3 0v4m0-2.5a1.5 1.5 0 0 1 3 0V10m0-1.5a1.5 1.5 0 0 1 3 0V12m0-.5a1.5 1.5 0 0 1 3 0v4.5a6 6 0 0 1-6 6h-1.2a6 6 0 0 1-4.8-2.4L4.6 15a1.6 1.6 0 0 1 2.4-2.1L8.5 14"/></svg>
+      <span>Mover</span>
+    </button>
+    <button class="btn-fer" data-fer="caneta" title="Caneta livre (C)">
+      <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5zM2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/></svg>
+      <span>Caneta</span>
+    </button>
+    <button class="btn-fer" data-fer="linha" title="Linha reta (L)">
+      <svg viewBox="0 0 24 24"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="1.6"/><circle cx="19" cy="5" r="1.6"/></svg>
+      <span>Linha</span>
+    </button>
+    <button class="btn-fer" data-fer="seta" title="Seta (S)">
+      <svg viewBox="0 0 24 24"><path d="M5 19L19 5M19 5h-7M19 5v7"/></svg>
+      <span>Seta</span>
+    </button>
+    <button class="btn-fer" data-fer="circulo" title="Círculo (O)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+      <span>Círculo</span>
+    </button>
+    <button class="btn-fer" data-fer="angulo" title="Ângulo em 3 cliques (A)">
+      <svg viewBox="0 0 24 24"><path d="M4 20L12 6M4 20h16M9.5 20a8 8 0 0 0-1.5-4.7"/></svg>
+      <span>Ângulo</span>
+    </button>
+    <button class="btn-fer" data-fer="texto" title="Caixa de texto: clique e escreva uma observação; clicar num texto já existente edita ele (T)">
+      <svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v13"/></svg>
+      <span>Texto</span>
+    </button>
+    <button class="btn-fer" data-fer="rastro" title="Rastro da bola: clique na bola em cada quadro (B)">
+      <svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="1"/><circle cx="9" cy="13" r="1"/><circle cx="13" cy="9" r="1"/><circle cx="18" cy="6" r="2.4"/></svg>
+      <span>Rastro</span>
+    </button>
+    <button class="btn-fer" data-fer="zoom" title="Zoom: clique para aproximar 2×, 3×, 4× (Z) · Esc volta ao normal">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg>
+      <span>Zoom</span>
+    </button>
+
+    <span class="rotulo">Cor</span>
+    <div class="cores" role="group" aria-label="Cor do traço">
+      <button class="cor ativa" style="background:#D8F000" data-cor="#D8F000" aria-label="Amarelo bola"></button>
+      <button class="cor" style="background:#FF5A5A" data-cor="#FF5A5A" aria-label="Vermelho"></button>
+      <button class="cor" style="background:#4FD8EB" data-cor="#4FD8EB" aria-label="Ciano"></button>
+      <button class="cor" style="background:#F2F6FA" data-cor="#F2F6FA" aria-label="Branco"></button>
+    </div>
+
+    <span class="rotulo">Ponteiro</span>
+    <button class="btn-fer ativo" id="btnApontador" title="Mostra um ponteiro tipo laser seguindo o mouse — útil pra marcar algo que você aponta e comenta sem precisar desenhar (P)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4"/><circle cx="12" cy="12" r="7" stroke-dasharray="2 3.5"/></svg>
+      <span>Laser</span>
+    </button>
+
+    <span class="rotulo">Editar</span>
+    <button class="btn-fer" id="btnDesfazer" title="Desfazer (Ctrl+Z)">
+      <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+      <span>Desfazer</span>
+    </button>
+    <button class="btn-fer" id="btnLimpar" title="Apagar anotações e rastro (X)">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
+      <span>Limpar</span>
+    </button>
+  </nav>
+
+  <section class="palco-envoltorio" id="envoltorio1Cam">
+    <div class="palco" id="palco">
+      <div class="zoom-wrap" id="zoomWrap">
+        <video id="video" playsinline crossorigin="anonymous"></video>
+        <canvas id="tela" class="tela-anot modo-mao"></canvas>
+      </div>
+      <div class="zoom-chip" id="zoomChip">Zoom 2×</div>
+      <div class="dica-flutuante" id="dica"></div>
+      <video id="webcamPreview1" class="webcam-pip" autoplay muted playsinline style="display:none"></video>
+
+      <div class="envio" id="areaEnvio">
+        <h2>Solte o vídeo do golpe aqui</h2>
+        <p>MP4, WebM ou MOV do saque, forehand, backhand…<br>O vídeo fica só no seu computador, nada é enviado para a internet.</p>
+        <button class="btn-primario" id="btnEscolher">Escolher arquivo de vídeo</button>
+        <input type="file" id="inputArquivo" accept="video/*" hidden>
+      </div>
+    </div>
+
+    <div class="controles" id="controles">
+      <div class="linha-tempo">
+        <span class="tempo" id="tempo">00:00.00 / 00:00.00</span>
+        <input type="range" id="barra" min="0" max="1000" value="0" step="1" aria-label="Linha do tempo do vídeo">
+      </div>
+      <div class="linha-botoes">
+        <button class="btn" id="btnQuadroTras" title="Quadro anterior (←)">
+          <svg viewBox="0 0 24 24"><path d="M19 20L9 12l10-8v16zM5 19V5"/></svg>
+        </button>
+        <button class="btn" id="btnPlay" title="Reproduzir / Pausar (Espaço)" aria-label="Reproduzir ou pausar">
+          <svg id="icoPlay" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="icoPause" viewBox="0 0 24 24" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+        </button>
+        <button class="btn" id="btnQuadroFrente" title="Próximo quadro (→)">
+          <svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8V4zM19 5v14"/></svg>
+        </button>
+
+        <div class="separador"></div>
+
+        <div class="grupo-velocidade" role="group" aria-label="Velocidade de reprodução">
+          <span class="rotulo-vel">Velocidade</span>
+          <button class="btn btn-vel" data-vel="0.25">0.25×</button>
+          <button class="btn btn-vel" data-vel="0.5">0.5×</button>
+          <button class="btn btn-vel ativo" data-vel="1">1×</button>
+        </div>
+
+        <div class="separador"></div>
+
+        <div class="grupo-velocidade" role="group" aria-label="Quadros por segundo do vídeo">
+          <span class="rotulo-vel">FPS</span>
+          <button class="btn btn-fps ativo" data-fps="30">30</button>
+          <button class="btn btn-fps" data-fps="60">60</button>
+          <button class="btn btn-fps" data-fps="120">120</button>
+        </div>
+
+        <div class="separador"></div>
+
+        <div class="grupo-velocidade" role="group" aria-label="Mixer de áudio">
+          <span class="rotulo-vel">Vídeo</span>
+          <input type="range" id="volVideo" class="mini-range" min="0" max="100" value="80" title="Volume do som original do vídeo (na escuta e na gravação)">
+          <span class="rotulo-vel">Mic</span>
+          <input type="range" id="volMic" class="mini-range" min="0" max="100" value="100" title="Volume da voz do coach na gravação">
+        </div>
+
+        <div class="separador"></div>
+        <button class="btn" id="btnModoLimpo" title="Ocultar painéis para gravação (H)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg>
+          Modo limpo
+        </button>
+
+        <div class="atalhos">
+          <kbd>Espaço</kbd> play · <kbd>←</kbd><kbd>→</kbd> quadro · <kbd>B</kbd> rastro · <kbd>Z</kbd> zoom · <kbd>P</kbd> laser · <kbd>R</kbd> gravar
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="palco-envoltorio duo-envoltorio" id="duoEnvoltorio" style="display:none">
+    <div class="duo-palco" id="duoPalco">
+      <div class="duo-coluna" id="duoColunaA">
+      <div class="duo-cam" data-cam="A">
+        <div class="duo-cam-rotulo">Câmera A</div>
+        <button class="duo-cam-trocar" data-cam-trocar="A" title="Trocar vídeo da Câmera A">
+          <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+        </button>
+        <div class="zoom-wrap" id="zoomWrapA">
+          <video id="videoA" playsinline crossorigin="anonymous"></video>
+          <canvas id="telaA" class="tela-anot modo-mao"></canvas>
+        </div>
+        <div class="zoom-chip" id="zoomChipA">Zoom 2×</div>
+        <div class="duo-cam-passo">
+          <button data-passo-cam="A" data-passo-dir="-1" title="Um quadro atrás — só a Câmera A (use para achar o instante exato do golpe antes de sincronizar)">
+            <svg viewBox="0 0 24 24"><path d="M19 20L9 12l10-8v16zM5 19V5"/></svg> A
+          </button>
+          <button data-passo-cam="A" data-passo-dir="1" title="Um quadro à frente — só a Câmera A">
+            A <svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8V4zM19 5v14"/></svg>
+          </button>
+        </div>
+        <div class="envio" id="areaEnvioA">
+          <h2>Solte o vídeo da Câmera A</h2>
+          <p>1º ângulo do mesmo golpe (ex: lateral)</p>
+          <button class="btn-primario" data-cam-btn="A">Escolher vídeo</button>
+          <input type="file" accept="video/*" hidden data-cam-input="A">
+        </div>
+      </div>
+      <div class="duo-tempo-individual">
+        <span class="tempo tempo-mini" id="duoTempoA">A · 00:00.00 / 00:00.00</span>
+        <input type="range" id="duoBarraA" min="0" max="1000" value="0" step="1" aria-label="Linha do tempo independente da Câmera A">
+      </div>
+      </div>
+      <div class="duo-coluna" id="duoColunaB">
+      <div class="duo-cam" data-cam="B">
+        <div class="duo-cam-rotulo">Câmera B</div>
+        <button class="duo-cam-trocar" data-cam-trocar="B" title="Trocar vídeo da Câmera B">
+          <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+        </button>
+        <div class="zoom-wrap" id="zoomWrapB">
+          <video id="videoB" playsinline crossorigin="anonymous"></video>
+          <canvas id="telaB" class="tela-anot modo-mao"></canvas>
+        </div>
+        <div class="zoom-chip" id="zoomChipB">Zoom 2×</div>
+        <div class="duo-cam-passo">
+          <button data-passo-cam="B" data-passo-dir="-1" title="Um quadro atrás — só a Câmera B (use para achar o instante exato do golpe antes de sincronizar)">
+            <svg viewBox="0 0 24 24"><path d="M19 20L9 12l10-8v16zM5 19V5"/></svg> B
+          </button>
+          <button data-passo-cam="B" data-passo-dir="1" title="Um quadro à frente — só a Câmera B">
+            B <svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8V4zM19 5v14"/></svg>
+          </button>
+        </div>
+        <div class="envio" id="areaEnvioB">
+          <h2>Solte o vídeo da Câmera B</h2>
+          <p>2º ângulo do mesmo golpe (ex: de frente/trás)</p>
+          <button class="btn-primario" data-cam-btn="B">Escolher vídeo</button>
+          <input type="file" accept="video/*" hidden data-cam-input="B">
+        </div>
+      </div>
+      <div class="duo-tempo-individual">
+        <span class="tempo tempo-mini" id="duoTempoB">B · 00:00.00 / 00:00.00</span>
+        <input type="range" id="duoBarraB" min="0" max="1000" value="0" step="1" aria-label="Linha do tempo independente da Câmera B">
+      </div>
+      </div>
+      <div class="dica-flutuante" id="dicaDuo"></div>
+      <video id="webcamPreview2" class="webcam-pip" autoplay muted playsinline style="display:none"></video>
+    </div>
+
+    <div class="controles" id="duoControles">
+      <div class="linha-tempo">
+        <span class="tempo" id="duoTempo">00:00.00 / 00:00.00</span>
+        <input type="range" id="duoBarra" min="0" max="1000" value="0" step="1" aria-label="Linha do tempo sincronizada (câmera A é a referência)">
+      </div>
+      <div class="linha-botoes">
+        <div class="grupo-velocidade" role="group" aria-label="Visualização das câmeras">
+          <span class="rotulo-vel">Ver</span>
+          <button class="btn ativo" data-ver="ambas" title="Mostrar as duas câmeras lado a lado">Lado a lado</button>
+          <button class="btn" data-ver="A" title="Mostrar só a Câmera A em tela cheia, mantendo a sincronia com a B">Câmera A</button>
+          <button class="btn" data-ver="B" title="Mostrar só a Câmera B em tela cheia, mantendo a sincronia com a A">Câmera B</button>
+        </div>
+
+        <div class="separador"></div>
+
+        <button class="btn" id="duoBtnQuadroTras" title="Quadro anterior nas duas câmeras (←)">
+          <svg viewBox="0 0 24 24"><path d="M19 20L9 12l10-8v16zM5 19V5"/></svg>
+        </button>
+        <button class="btn" id="duoBtnPlay" title="Reproduzir / Pausar as duas câmeras (Espaço)" aria-label="Reproduzir ou pausar">
+          <svg id="duoIcoPlay" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="duoIcoPause" viewBox="0 0 24 24" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+        </button>
+        <button class="btn" id="duoBtnQuadroFrente" title="Próximo quadro nas duas câmeras (→)">
+          <svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8V4zM19 5v14"/></svg>
+        </button>
+
+        <div class="separador"></div>
+
+        <div class="grupo-velocidade" role="group" aria-label="Velocidade de reprodução">
+          <span class="rotulo-vel">Velocidade</span>
+          <button class="btn btn-vel-duo" data-vel="0.25">0.25×</button>
+          <button class="btn btn-vel-duo" data-vel="0.5">0.5×</button>
+          <button class="btn btn-vel-duo ativo" data-vel="1">1×</button>
+        </div>
+
+        <div class="separador"></div>
+
+        <div class="grupo-velocidade" role="group" aria-label="Quadros por segundo do vídeo">
+          <span class="rotulo-vel">FPS</span>
+          <button class="btn btn-fps-duo ativo" data-fps="30">30</button>
+          <button class="btn btn-fps-duo" data-fps="60">60</button>
+          <button class="btn btn-fps-duo" data-fps="120">120</button>
+        </div>
+
+        <div class="separador"></div>
+
+        <div class="grupo-velocidade" id="grupoDefasagem" role="group" aria-label="Defasagem entre as câmeras">
+          <span class="rotulo-vel">Defasagem B</span>
+          <button class="btn" id="duoDefMenos" title="Atrasar câmera B em 0,1s">−0.1s</button>
+          <span class="tempo" id="duoDefValor">0.00s</span>
+          <button class="btn" id="duoDefMais" title="Adiantar câmera B em 0,1s">+0.1s</button>
+          <button class="btn" id="duoSincAgora" title="Use as setinhas A/B de cada câmera para achar o mesmo instante do golpe (ex: toque na bola) nas duas, depois clique aqui para calcular a defasagem">Sincronizar aqui</button>
+        </div>
+
+        <div class="separador"></div>
+
+        <div class="grupo-velocidade" role="group" aria-label="Mixer de áudio">
+          <span class="rotulo-vel">Áudio A</span>
+          <input type="range" id="duoVolA" class="mini-range" min="0" max="100" value="80" title="Volume do áudio original da Câmera A (na escuta e na gravação)">
+          <button class="btn" id="duoMuteB" title="Câmera B está sem áudio (evita eco de duas câmeras captando o mesmo som). Clique para ativar.">🔇 Câmera B</button>
+          <span class="rotulo-vel">Mic</span>
+          <input type="range" id="duoVolMic" class="mini-range" min="0" max="100" value="100" title="Volume da voz do coach na gravação">
+        </div>
+
+        <div class="separador"></div>
+        <button class="btn" id="duoModoLimpo" title="Ocultar painéis para gravação (H)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg>
+          Modo limpo
+        </button>
+
+        <div class="atalhos">
+          <kbd>Espaço</kbd> play · <kbd>←</kbd><kbd>→</kbd> quadro · <kbd>Z</kbd> zoom · <kbd>P</kbd> laser · <kbd>R</kbd> gravar
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="aviso-download" id="avisoDownload"></div>
+<textarea id="caixaTextoEdicao" class="caixa-texto-edicao" style="display:none" placeholder="Escreva sua observação…"></textarea>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Referências ----------
+  const video = document.getElementById('video');
+  const tela = document.getElementById('tela');
+  const ctxTela = tela.getContext('2d');
+  const palco = document.getElementById('palco');
+  const areaEnvio = document.getElementById('areaEnvio');
+  const inputArquivo = document.getElementById('inputArquivo');
+  const nomeArquivo = document.getElementById('nomeArquivo');
+  const barra = document.getElementById('barra');
+  const tempoEl = document.getElementById('tempo');
+  const btnPlay = document.getElementById('btnPlay');
+  const icoPlay = document.getElementById('icoPlay');
+  const icoPause = document.getElementById('icoPause');
+  const dica = document.getElementById('dica');
+
+  // ---------- Estado ----------
+  let FPS = 30;                 // quadros por segundo do vídeo (ajustável)
+  let ferramenta = 'mao';
+  let cor = '#D8F000';
+  let anotacoes = [];           // formas com coordenadas NORMALIZADAS (0 a 1)
+  let formaAtual = null;
+  let pontosAngulo = [];
+  let rastro = [];              // pontos da bola: {x, y, t} normalizados + tempo do vídeo
+  let corRastro = '#D8F000';
+
+  // Apontador tipo laser: mostra um ponto/trilha seguindo o mouse mesmo sem
+  // clicar, pra não perder observações que o coach só aponta e comenta.
+  // trilhaApontador guarda os últimos pontos com timestamp (relógio real,
+  // não o tempo do vídeo, já que é um gesto ao vivo).
+  let apontadorAtivo = true;
+  let trilhaApontador = [];
+
+  // Webcam do coach: uma única captura (MediaStream) alimentando os dois
+  // modos (o preview visível depende de qual seção está ativa no momento).
+  let webcamStream = null;
+
+  // Ferramenta "Mover": permite selecionar uma marcação já feita (linha,
+  // seta, círculo, ângulo, caneta) e arrastar o corpo inteiro (move) ou uma
+  // alça específica (ajusta/redimensiona). Estado do modo 1 câmera:
+  const TOLERANCIA_SELECAO = 14; // px de tolerância pra "pegar" uma forma/alça
+  let formaSelecionada = null;      // referência direta ao objeto dentro de `anotacoes`
+  let alcaArrastando = null;        // null = arrastando o corpo inteiro; senão, nome da alça
+  let arrastarInicio = null;        // {x,y} normalizado, onde o arrasto começou
+  let formaInicioSnapshot = null;   // cópia da forma no início do arrasto (pra calcular delta)
+  // Estado equivalente do modo 2 câmeras (uma seleção só, mas sabendo de qual câmera é)
+  let formaSelecionadaDuo = null;
+  let camSelecionadaDuo = null;     // 'A' ou 'B'
+  let alcaArrastandoDuo = null;
+  let arrastarInicioDuo = null;
+  let formaInicioSnapshotDuo = null;
+
+  // Modo atual da ferramenta: '1cam' (padrão, tela original) ou '2cam' (duas câmeras lado a lado)
+  let modoAtual = '1cam';
+  let nomeArquivoUnico = 'Nenhum vídeo carregado';
+  let nomeArquivoAtxt = 'Câmera A', nomeArquivoBtxt = 'Câmera B';
+  function atualizarRotuloSessao(){
+    nomeArquivo.textContent = modoAtual === '2cam'
+      ? (nomeArquivoAtxt + ' + ' + nomeArquivoBtxt)
+      : nomeArquivoUnico;
+  }
+
+  // ---------- Carregar vídeo ----------
+  function carregarArquivo(arq){
+    if(!arq || !arq.type.startsWith('video')) return;
+    video.src = URL.createObjectURL(arq);
+    nomeArquivoUnico = arq.name;
+    atualizarRotuloSessao();
+    areaEnvio.style.display = 'none';
+    anotacoes = []; pontosAngulo = []; rastro = [];
+    video.addEventListener('loadedmetadata', ajustarTela, {once:true});
+  }
+  document.getElementById('btnEscolher').addEventListener('click', () => inputArquivo.click());
+  document.getElementById('btnTrocarVideo').addEventListener('click', () => inputArquivo.click());
+  inputArquivo.addEventListener('change', e => carregarArquivo(e.target.files[0]));
+  ['dragover','dragenter'].forEach(ev => palco.addEventListener(ev, e => {
+    e.preventDefault(); areaEnvio.classList.add('arrastando');
+  }));
+  ['dragleave','drop'].forEach(ev => palco.addEventListener(ev, e => {
+    e.preventDefault(); areaEnvio.classList.remove('arrastando');
+  }));
+  palco.addEventListener('drop', e => carregarArquivo(e.dataTransfer.files[0]));
+
+  // ---------- Canvas alinhado ao vídeo ----------
+  const zoomWrap = document.getElementById('zoomWrap');
+  const zoomChip = document.getElementById('zoomChip');
+  let telaW = 1, telaH = 1; // tamanho de layout do vídeo (sem contar o zoom)
+
+  function ajustarTela(){
+    // offsetWidth/Height ignoram o transform do zoom: é o tamanho "real" de layout
+    telaW = Math.max(1, video.offsetWidth);
+    telaH = Math.max(1, video.offsetHeight);
+    tela.style.left = '0px';
+    tela.style.top = '0px';
+    tela.style.width = telaW + 'px';
+    tela.style.height = telaH + 'px';
+    const dpr = window.devicePixelRatio || 1;
+    tela.width = telaW * dpr;
+    tela.height = telaH * dpr;
+    ctxTela.setTransform(dpr,0,0,dpr,0,0);
+    // Webcam fica ancorada ao próprio vídeo (zoomWrap), não ao palco inteiro,
+    // porque o palco pode ter faixas pretas (letterbox) ao redor do vídeo.
+    posicionarWebcamPip(webcamPreview1, zoomWrap.offsetLeft, zoomWrap.offsetTop, telaW, telaH);
+  }
+  window.addEventListener('resize', ajustarTela);
+  new ResizeObserver(ajustarTela).observe(palco);
+
+  // ---------- Zoom digital ----------
+  // z = fator de ampliação; cx,cy = centro (0 a 1); lx,ly = canto visível calculado
+  const zoom = { z:1, cx:.5, cy:.5, lx:0, ly:0 };
+  function aplicarZoom(){
+    if(zoom.z <= 1){
+      zoom.z = 1; zoom.lx = 0; zoom.ly = 0;
+      zoomWrap.style.transform = '';
+      zoomChip.classList.remove('visivel');
+      return;
+    }
+    const vis = 1/zoom.z; // fração do vídeo visível
+    zoom.lx = Math.min(Math.max(zoom.cx - vis/2, 0), 1 - vis);
+    zoom.ly = Math.min(Math.max(zoom.cy - vis/2, 0), 1 - vis);
+    const ox = (zoom.lx / (1 - vis)) * 100;
+    const oy = (zoom.ly / (1 - vis)) * 100;
+    zoomWrap.style.transformOrigin = ox + '% ' + oy + '%';
+    zoomWrap.style.transform = 'scale(' + zoom.z + ')';
+    zoomChip.textContent = 'Zoom ' + zoom.z + '×';
+    zoomChip.classList.add('visivel');
+  }
+  function zerarZoom(){ zoom.z = 1; aplicarZoom(); }
+
+  // ---------- Desenho (coordenadas normalizadas -> pixels) ----------
+  // W e H: tamanho de destino em pixels. s: fator de escala do traço.
+  function tracar(f, ctx, W, H, s){
+    const X = v => v * W, Y = v => v * H;
+    ctx.strokeStyle = f.cor; ctx.fillStyle = f.cor;
+    ctx.lineWidth = 3 * s; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.setLineDash([]);
+    if(f.tipo === 'caneta'){
+      ctx.beginPath();
+      f.pts.forEach((p,i) => i ? ctx.lineTo(X(p.x),Y(p.y)) : ctx.moveTo(X(p.x),Y(p.y)));
+      ctx.stroke();
+    }
+    if(f.tipo === 'linha'){
+      ctx.beginPath(); ctx.moveTo(X(f.x1),Y(f.y1)); ctx.lineTo(X(f.x2),Y(f.y2)); ctx.stroke();
+    }
+    if(f.tipo === 'seta'){
+      ctx.beginPath(); ctx.moveTo(X(f.x1),Y(f.y1)); ctx.lineTo(X(f.x2),Y(f.y2)); ctx.stroke();
+      const ang = Math.atan2(Y(f.y2)-Y(f.y1), X(f.x2)-X(f.x1)), t = 14*s;
+      ctx.beginPath();
+      ctx.moveTo(X(f.x2),Y(f.y2));
+      ctx.lineTo(X(f.x2) - t*Math.cos(ang-0.5), Y(f.y2) - t*Math.sin(ang-0.5));
+      ctx.moveTo(X(f.x2),Y(f.y2));
+      ctx.lineTo(X(f.x2) - t*Math.cos(ang+0.5), Y(f.y2) - t*Math.sin(ang+0.5));
+      ctx.stroke();
+    }
+    if(f.tipo === 'circulo'){
+      const r = Math.hypot(X(f.x2)-X(f.x1), Y(f.y2)-Y(f.y1));
+      ctx.beginPath(); ctx.arc(X(f.x1),Y(f.y1),r,0,Math.PI*2); ctx.stroke();
+    }
+    if(f.tipo === 'angulo'){
+      const [A,B,C] = f.pts.map(p => ({x:X(p.x), y:Y(p.y)}));
+      ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.lineTo(C.x,C.y); ctx.stroke();
+      [A,B,C].forEach(p => { ctx.beginPath(); ctx.arc(p.x,p.y,4*s,0,Math.PI*2); ctx.fill(); });
+      const a1 = Math.atan2(A.y-B.y, A.x-B.x);
+      const a2 = Math.atan2(C.y-B.y, C.x-B.x);
+      let dif = a2 - a1;
+      while(dif <= -Math.PI) dif += 2*Math.PI;
+      while(dif >   Math.PI) dif -= 2*Math.PI;
+      const graus = Math.abs(dif*180/Math.PI);
+      ctx.beginPath(); ctx.arc(B.x,B.y,28*s,a1,a2, dif<0); ctx.stroke();
+      const meio = a1 + dif/2;
+      const tx = B.x + 48*s*Math.cos(meio), ty = B.y + 48*s*Math.sin(meio);
+      ctx.font = "600 " + (16*s) + "px 'Barlow Condensed',sans-serif";
+      const texto = graus.toFixed(1) + '°';
+      const w = ctx.measureText(texto).width;
+      ctx.fillStyle = 'rgba(13,27,42,.85)';
+      ctx.fillRect(tx - w/2 - 6*s, ty - 13*s, w + 12*s, 22*s);
+      ctx.fillStyle = f.cor;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(texto, tx, ty);
+    }
+    if(f.tipo === 'texto'){
+      const tam = TAMANHO_TEXTO * s;
+      ctx.font = "600 " + tam + "px 'Barlow Condensed',sans-serif";
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      const linhas = f.texto.split('\n');
+      const alturaLinha = tam * 1.3;
+      const largura = Math.max(...linhas.map(l => ctx.measureText(l).width));
+      const px = X(f.x), py = Y(f.y);
+      ctx.fillStyle = 'rgba(13,27,42,.6)';
+      ctx.fillRect(px - 5*s, py - 4*s, largura + 10*s, linhas.length*alturaLinha + 8*s);
+      ctx.fillStyle = f.cor;
+      linhas.forEach((linha,i) => ctx.fillText(linha, px, py + i*alturaLinha));
+    }
+  }
+
+  // ---------- Ferramenta "Mover": selecionar e arrastar/ajustar formas ----------
+  // Distância de um ponto até um SEGMENTO de reta, tudo já em pixels.
+  function distanciaAoSegmento(px, py, x1, y1, x2, y2){
+    const dx = x2-x1, dy = y2-y1;
+    const compQuad = dx*dx + dy*dy;
+    let t = compQuad ? ((px-x1)*dx + (py-y1)*dy) / compQuad : 0;
+    t = Math.max(0, Math.min(1, t));
+    const cx = x1 + t*dx, cy = y1 + t*dy;
+    return Math.hypot(px-cx, py-cy);
+  }
+  // Distância (em px) de um ponto normalizado p até a forma f, já desenhada
+  // numa área de W×H px. Usada tanto pra selecionar (clicou perto?) quanto
+  // pra decidir qual forma está "por cima" quando várias se sobrepõem.
+  // ---------- Caixa de texto ----------
+  const TAMANHO_TEXTO = 18; // px de fonte, na escala s=1 (tela ao vivo)
+  const ctxMedida = document.createElement('canvas').getContext('2d');
+  function medirTexto(texto, tamanhoPx){
+    ctxMedida.font = "600 " + tamanhoPx + "px 'Barlow Condensed',sans-serif";
+    const linhas = texto.split('\n');
+    const largura = Math.max(...linhas.map(l => ctxMedida.measureText(l).width));
+    return { largura, linhas: linhas.length };
+  }
+
+  function distanciaFormaPx(f, p, W, H){
+    const X = v => v*W, Y = v => v*H;
+    const px = X(p.x), py = Y(p.y);
+    if(f.tipo === 'linha' || f.tipo === 'seta'){
+      return distanciaAoSegmento(px, py, X(f.x1), Y(f.y1), X(f.x2), Y(f.y2));
+    }
+    if(f.tipo === 'circulo'){
+      const cx = X(f.x1), cy = Y(f.y1);
+      const r = Math.hypot(X(f.x2)-cx, Y(f.y2)-cy);
+      return Math.abs(Math.hypot(px-cx, py-cy) - r);
+    }
+    if(f.tipo === 'angulo'){
+      const [A,B,C] = f.pts.map(q => ({x:X(q.x), y:Y(q.y)}));
+      return Math.min(
+        distanciaAoSegmento(px, py, A.x, A.y, B.x, B.y),
+        distanciaAoSegmento(px, py, B.x, B.y, C.x, C.y)
+      );
+    }
+    if(f.tipo === 'caneta'){
+      if(f.pts.length === 1) return Math.hypot(px - X(f.pts[0].x), py - Y(f.pts[0].y));
+      let menor = Infinity;
+      for(let i=1;i<f.pts.length;i++){
+        const a = f.pts[i-1], b = f.pts[i];
+        const d = distanciaAoSegmento(px, py, X(a.x), Y(a.y), X(b.x), Y(b.y));
+        if(d < menor) menor = d;
+      }
+      return menor;
+    }
+    if(f.tipo === 'texto'){
+      const { largura, linhas } = medirTexto(f.texto, TAMANHO_TEXTO);
+      const altura = linhas * TAMANHO_TEXTO * 1.3;
+      const x0 = X(f.x) - 5, y0 = Y(f.y) - 4, x1 = x0 + largura + 10, y1 = y0 + altura + 8;
+      if(px >= x0 && px <= x1 && py >= y0 && py <= y1) return 0;
+      const dx = Math.max(x0-px, 0, px-x1), dy = Math.max(y0-py, 0, py-y1);
+      return Math.hypot(dx, dy);
+    }
+    return Infinity;
+  }
+  // Pontos "alça" (controles) de cada forma, em coordenadas normalizadas —
+  // arrastar uma alça ajusta só aquele ponto (corrige tamanho/posição);
+  // arrastar fora das alças mas em cima da forma move o conjunto inteiro.
+  function alcasDaForma(f){
+    if(f.tipo === 'linha' || f.tipo === 'seta') return [{x:f.x1,y:f.y1,ref:'p1'}, {x:f.x2,y:f.y2,ref:'p2'}];
+    if(f.tipo === 'circulo') return [{x:f.x1,y:f.y1,ref:'centro'}, {x:f.x2,y:f.y2,ref:'raio'}];
+    if(f.tipo === 'angulo') return f.pts.map((p,i) => ({x:p.x, y:p.y, ref:'pt'+i}));
+    return []; // caneta e texto só movem o conjunto inteiro, sem alças individuais
+  }
+  // Aplica um arrasto (delta dx,dy a partir do snapshot `orig`) numa forma —
+  // usada tanto pelo modo 1 câmera quanto pelo 2 câmeras.
+  function aplicarArrastoGenerico(f, orig, alca, dx, dy){
+    if(alca){
+      if(alca === 'p1'){ f.x1 = orig.x1+dx; f.y1 = orig.y1+dy; }
+      else if(alca === 'p2' || alca === 'raio'){ f.x2 = orig.x2+dx; f.y2 = orig.y2+dy; }
+      else if(alca === 'centro'){
+        f.x1 = orig.x1+dx; f.y1 = orig.y1+dy;
+        f.x2 = orig.x2+dx; f.y2 = orig.y2+dy;
+      }
+      else if(alca.startsWith('pt')){
+        const i = parseInt(alca.slice(2), 10);
+        f.pts[i] = {x:orig.pts[i].x+dx, y:orig.pts[i].y+dy};
+      }
+      return;
+    }
+    // arrasto do corpo inteiro (sem alça específica)
+    if(f.tipo === 'caneta' || f.tipo === 'angulo'){
+      f.pts = orig.pts.map(q => ({x:q.x+dx, y:q.y+dy}));
+    } else if(f.tipo === 'texto'){
+      f.x = orig.x+dx; f.y = orig.y+dy;
+    } else {
+      f.x1 = orig.x1+dx; f.y1 = orig.y1+dy;
+      f.x2 = orig.x2+dx; f.y2 = orig.y2+dy;
+    }
+  }
+  // Desenha as alças da forma selecionada (só na tela ao vivo, nunca na gravação)
+  function desenharSelecao(ctx, W, H, s, forma){
+    if(!forma) return;
+    alcasDaForma(forma).forEach(a => {
+      ctx.beginPath();
+      ctx.arc(a.x*W, a.y*H, 7*s, 0, Math.PI*2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.lineWidth = 2*s;
+      ctx.strokeStyle = '#2F6FED';
+      ctx.stroke();
+    });
+  }
+
+  // Abre a caixinha de edição de texto (HTML normal, sobreposta) na posição
+  // do clique. Reaproveitada tanto pra criar um texto novo quanto pra editar
+  // um já existente (duplo clique). Confirma ao perder o foco; Esc cancela.
+  const caixaTextoEdicao = document.getElementById('caixaTextoEdicao');
+  function abrirEdicaoTexto(clientX, clientY, corTexto, valorInicial, aoConfirmar){
+    caixaTextoEdicao.value = valorInicial || '';
+    caixaTextoEdicao.style.color = corTexto;
+    caixaTextoEdicao.style.left = Math.round(clientX) + 'px';
+    caixaTextoEdicao.style.top = Math.round(clientY) + 'px';
+    caixaTextoEdicao.style.display = 'block';
+    caixaTextoEdicao.focus();
+    caixaTextoEdicao.select();
+    function onBlur(){ finalizar(false); }
+    function onKeydown(e){
+      e.stopPropagation();
+      if(e.key === 'Escape') finalizar(true);
+    }
+    function finalizar(cancelar){
+      caixaTextoEdicao.style.display = 'none';
+      caixaTextoEdicao.removeEventListener('blur', onBlur);
+      caixaTextoEdicao.removeEventListener('keydown', onKeydown);
+      if(!cancelar) aoConfirmar(caixaTextoEdicao.value.trim());
+    }
+    caixaTextoEdicao.addEventListener('blur', onBlur);
+    caixaTextoEdicao.addEventListener('keydown', onKeydown);
+  }
+  // Versão genérica (recebe os próprios pontos e cor) para servir tanto o
+  // modo 1 câmera quanto o modo 2 câmeras.
+  function tracarRastroGenerico(ctx, W, H, s, tempoAtual, pontos, corPontos){
+    if(!pontos.length) return;
+    const visiveis = pontos.filter(p => p.t <= tempoAtual + 0.02);
+    if(!visiveis.length) return;
+    const X = v => v*W, Y = v => v*H;
+    // linha pontilhada ligando os pontos
+    ctx.strokeStyle = corPontos;
+    ctx.lineWidth = 2.5 * s;
+    ctx.setLineDash([2*s, 9*s]);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    visiveis.forEach((p,i) => i ? ctx.lineTo(X(p.x),Y(p.y)) : ctx.moveTo(X(p.x),Y(p.y)));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // bolinhas em cada posição registrada
+    ctx.fillStyle = corPontos;
+    visiveis.forEach(p => {
+      ctx.beginPath(); ctx.arc(X(p.x),Y(p.y),3.2*s,0,Math.PI*2); ctx.fill();
+    });
+    // posição "atual" da bola: última visível, com anel de destaque
+    const u = visiveis[visiveis.length-1];
+    ctx.beginPath(); ctx.arc(X(u.x),Y(u.y),7*s,0,Math.PI*2);
+    ctx.lineWidth = 2.5*s; ctx.strokeStyle = corPontos; ctx.stroke();
+  }
+  function tracarRastro(ctx, W, H, s, tempoAtual){
+    tracarRastroGenerico(ctx, W, H, s, tempoAtual, rastro, corRastro);
+  }
+
+  // ---------- Apontador tipo laser (segue o mouse, sem precisar clicar) ----------
+  // Usa relógio real (performance.now), não o tempo do vídeo: é um gesto ao
+  // vivo do coach, então precisa acompanhar o movimento em tempo real mesmo
+  // com o vídeo pausado.
+  const DURACAO_APONTADOR = 550; // ms que cada ponto da trilha fica visível
+  function registrarPontoApontador(buffer, p){
+    const agora = performance.now();
+    buffer.push({x:p.x, y:p.y, t:agora});
+    const limite = agora - (DURACAO_APONTADOR + 150);
+    while(buffer.length && buffer[0].t < limite) buffer.shift();
+  }
+  function tracarApontador(ctx, W, H, s, pontos, corPonteiro){
+    if(!pontos.length) return;
+    const agora = performance.now();
+    const X = v => v*W, Y = v => v*H;
+    pontos.forEach(p => {
+      const idade = agora - p.t;
+      if(idade < 0 || idade > DURACAO_APONTADOR) return;
+      const alpha = 1 - idade/DURACAO_APONTADOR;
+      ctx.globalAlpha = alpha * 0.45;
+      ctx.fillStyle = corPonteiro;
+      ctx.beginPath();
+      ctx.arc(X(p.x), Y(p.y), (2.5 + 5*alpha) * s, 0, Math.PI*2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    const atual = pontos[pontos.length - 1];
+    if(atual && (agora - atual.t) <= DURACAO_APONTADOR){
+      ctx.beginPath();
+      ctx.fillStyle = corPonteiro;
+      ctx.arc(X(atual.x), Y(atual.y), 6*s, 0, Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.strokeStyle = corPonteiro;
+      ctx.lineWidth = 2*s;
+      ctx.arc(X(atual.x), Y(atual.y), 11*s, 0, Math.PI*2);
+      ctx.stroke();
+    }
+  }
+
+  // ---------- Webcam do coach (picture-in-picture) ----------
+  // PROP_WEBCAM_LARGURA é a ÚNICA fonte de verdade do tamanho da webcam: é
+  // usada tanto pra posicionar o <video> ao vivo (via CSS/JS) quanto pra
+  // desenhar no canvas de gravação. Assim o tamanho final da gravação fica
+  // idêntico ao que o coach vê ao vivo, na mesma proporção do vídeo.
+  const PROP_WEBCAM_LARGURA = 0.08; // fração da largura do vídeo ocupada pela webcam
+  const PROP_WEBCAM_AZ = 0.75;      // proporção altura/largura da webcam (4:3)
+
+  // Posiciona o <video> da webcam (pré-visualização) encostado no topo do
+  // vídeo, centralizado — refX/refY são o deslocamento do "quadro" do vídeo
+  // dentro do elemento pai (necessário pra não ficar sobre uma faixa preta
+  // de letterbox), refW/refH são a largura/altura desse quadro.
+  function posicionarWebcamPip(elPip, refX, refY, refW, refH){
+    const pipW = Math.max(60, refW * PROP_WEBCAM_LARGURA);
+    const pipH = pipW * PROP_WEBCAM_AZ;
+    elPip.style.width = pipW + 'px';
+    elPip.style.height = pipH + 'px';
+    elPip.style.left = Math.round(refX + refW - pipW) + 'px'; // encostado na direita
+    elPip.style.top = Math.round(refY) + 'px';                // encostado no topo
+  }
+
+  function tracarRetanguloArredondado(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y,   x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x,   y+h, r);
+    ctx.arcTo(x,   y+h, x,   y,   r);
+    ctx.arcTo(x,   y,   x+w, y,   r);
+    ctx.closePath();
+  }
+  // Desenha a webcam do coach no canto superior direito do canvas de
+  // gravação, na MESMA proporção (PROP_WEBCAM_LARGURA) usada no preview ao
+  // vivo — garante que o tamanho final gravado seja igual ao que aparece na tela.
+  function desenharWebcamPip(ctx, W, H){
+    if(!webcamStream) return;
+    // Usa o <video> visível no modo atual (o outro pode ficar "congelado"
+    // por estar dentro de uma seção com display:none)
+    const v = modoAtual === '2cam' ? webcamPreview2 : webcamPreview1;
+    if(!v || v.readyState < 2) return;
+    const pipW = Math.max(60, Math.round(W * PROP_WEBCAM_LARGURA));
+    const pipH = Math.round(pipW * PROP_WEBCAM_AZ);
+    const x = W - pipW; // encostado na direita
+    const y = 0;         // encostado no topo
+    const raio = Math.round(pipW * 0.08);
+    const vw = v.videoWidth || 4, vh = v.videoHeight || 3;
+    const escalaFit = Math.max(pipW/vw, pipH/vh);
+    const dw = vw*escalaFit, dh = vh*escalaFit;
+    const dx = x + (pipW-dw)/2, dy = y + (pipH-dh)/2;
+    ctx.save();
+    tracarRetanguloArredondado(ctx, x, y, pipW, pipH, raio);
+    ctx.clip();
+    ctx.drawImage(v, dx, dy, dw, dh); // sem espelhar: fica correto pra quem for assistir depois
+    ctx.restore();
+    tracarRetanguloArredondado(ctx, x, y, pipW, pipH, raio);
+    ctx.lineWidth = Math.max(2, pipW*0.02);
+    ctx.strokeStyle = '#D8F000';
+    ctx.stroke();
+  }
+
+  function desenharTudo(ctx, W, H, s, tempoAtual, mostrarSelecao){
+    anotacoes.forEach(f => tracar(f, ctx, W, H, s));
+    if(formaAtual) tracar(formaAtual, ctx, W, H, s);
+    tracarRastro(ctx, W, H, s, tempoAtual);
+    pontosAngulo.forEach(p => {
+      ctx.fillStyle = cor;
+      ctx.beginPath(); ctx.arc(p.x*W, p.y*H, 5*s, 0, Math.PI*2); ctx.fill();
+    });
+    if(apontadorAtivo) tracarApontador(ctx, W, H, s, trilhaApontador, cor);
+    if(mostrarSelecao && ferramenta === 'mao' && formaSelecionada) desenharSelecao(ctx, W, H, s, formaSelecionada);
+  }
+
+  // Loop contínuo: redesenha a tela a cada quadro (necessário porque o rastro
+  // acompanha o tempo do vídeo, então precisa ser atualizado durante o play)
+  function laco(){
+    if(modoAtual === '1cam'){
+      ctxTela.clearRect(0,0,telaW,telaH);
+      desenharTudo(ctxTela, telaW, telaH, 1, video.currentTime || 0, true);
+      atualizarTempo();
+    }
+    requestAnimationFrame(laco);
+  }
+  requestAnimationFrame(laco);
+
+  // ---------- Interação de desenho ----------
+  function posicaoRelativa(e, canvasEl){
+    const r = canvasEl.getBoundingClientRect();
+    return { x:(e.clientX - r.left)/r.width, y:(e.clientY - r.top)/r.height };
+  }
+  function posicao(e){
+    return posicaoRelativa(e, tela);
+  }
+
+  tela.addEventListener('pointerdown', e => {
+    if(!video.src) return;
+    if(ferramenta === 'mao'){ iniciarSelecaoOuArrasto(e); return; }
+    e.preventDefault();
+    tela.setPointerCapture(e.pointerId);
+    const p = posicao(e);
+
+    if(ferramenta === 'zoom'){
+      // Cada clique aproxima mais, centrado onde você clicou: 2× → 3× → 4× → normal
+      if(zoom.z >= 4){ zerarZoom(); mostrarDica('Zoom desativado'); setTimeout(esconderDica,1500); }
+      else{
+        zoom.z = zoom.z < 2 ? 2 : zoom.z + 1;
+        zoom.cx = p.x; zoom.cy = p.y;
+        aplicarZoom();
+      }
+      return;
+    }
+    if(ferramenta === 'rastro'){
+      video.pause();
+      rastro.push({x:p.x, y:p.y, t:video.currentTime});
+      rastro.sort((a,b) => a.t - b.t);
+      corRastro = cor;
+      mostrarDica('Ponto ' + rastro.length + ' marcado · avançando 1 quadro… clique na bola de novo');
+      passoQuadro(1); // avança sozinho para o próximo quadro
+      return;
+    }
+    if(ferramenta === 'angulo'){
+      pontosAngulo.push(p);
+      if(pontosAngulo.length === 2) mostrarDica('Agora clique no fim do 2º segmento');
+      if(pontosAngulo.length === 3){
+        anotacoes.push({tipo:'angulo', cor, pts:pontosAngulo.slice()});
+        pontosAngulo = [];
+        esconderDica();
+      }
+      return;
+    }
+    if(ferramenta === 'texto'){
+      // Clicou em cima de um texto já existente? Edita em vez de criar um novo
+      for(let i = anotacoes.length - 1; i >= 0; i--){
+        const fExistente = anotacoes[i];
+        if(fExistente.tipo === 'texto' && distanciaFormaPx(fExistente, p, telaW, telaH) <= TOLERANCIA_SELECAO){
+          abrirEdicaoTexto(e.clientX, e.clientY, fExistente.cor, fExistente.texto, valor => {
+            if(valor) fExistente.texto = valor;
+            else anotacoes.splice(anotacoes.indexOf(fExistente), 1);
+          });
+          return;
+        }
+      }
+      abrirEdicaoTexto(e.clientX, e.clientY, cor, '', valor => {
+        if(valor) anotacoes.push({tipo:'texto', cor, x:p.x, y:p.y, texto:valor});
+      });
+      return;
+    }
+    if(ferramenta === 'caneta'){
+      formaAtual = {tipo:'caneta', cor, pts:[p]};
+    } else {
+      formaAtual = {tipo:ferramenta, cor, x1:p.x, y1:p.y, x2:p.x, y2:p.y};
+    }
+  });
+  tela.addEventListener('pointermove', e => {
+    if(ferramenta === 'mao'){ moverSelecaoOuArrasto(e); return; }
+    if(!formaAtual) return;
+    const p = posicao(e);
+    if(formaAtual.tipo === 'caneta') formaAtual.pts.push(p);
+    else { formaAtual.x2 = p.x; formaAtual.y2 = p.y; }
+  });
+  tela.addEventListener('pointerup', () => {
+    if(ferramenta === 'mao'){ finalizarSelecaoOuArrasto(); return; }
+    if(formaAtual){ anotacoes.push(formaAtual); formaAtual = null; }
+  });
+  // Duplo clique num texto existente com "Mover" selecionado reabre pra editar
+  // (com a ferramenta "Texto" isso já acontece no próprio clique único)
+  tela.addEventListener('dblclick', e => {
+    if(ferramenta !== 'mao') return;
+    const p = posicao(e);
+    for(let i = anotacoes.length - 1; i >= 0; i--){
+      const f = anotacoes[i];
+      if(f.tipo === 'texto' && distanciaFormaPx(f, p, telaW, telaH) <= TOLERANCIA_SELECAO){
+        abrirEdicaoTexto(e.clientX, e.clientY, f.cor, f.texto, valor => {
+          if(valor) f.texto = valor;
+          else anotacoes.splice(anotacoes.indexOf(f), 1);
+        });
+        return;
+      }
+    }
+  });
+
+  // ---- Ferramenta Mover (modo 1 câmera): seleciona e arrasta/ajusta formas ----
+  function iniciarSelecaoOuArrasto(e){
+    const p = posicao(e);
+    // 1) Se já tem forma selecionada, testa as alças dela primeiro (prioridade)
+    if(formaSelecionada){
+      for(const a of alcasDaForma(formaSelecionada)){
+        const d = Math.hypot((a.x-p.x)*telaW, (a.y-p.y)*telaH);
+        if(d <= TOLERANCIA_SELECAO){
+          alcaArrastando = a.ref;
+          arrastarInicio = p;
+          formaInicioSnapshot = JSON.parse(JSON.stringify(formaSelecionada));
+          tela.setPointerCapture(e.pointerId);
+          return;
+        }
+      }
+    }
+    // 2) Testa o corpo de todas as formas, da mais recente (por cima) pra mais antiga
+    for(let i = anotacoes.length - 1; i >= 0; i--){
+      if(distanciaFormaPx(anotacoes[i], p, telaW, telaH) <= TOLERANCIA_SELECAO){
+        formaSelecionada = anotacoes[i];
+        alcaArrastando = null;
+        arrastarInicio = p;
+        formaInicioSnapshot = JSON.parse(JSON.stringify(anotacoes[i]));
+        tela.setPointerCapture(e.pointerId);
+        return;
+      }
+    }
+    // 3) Clicou vazio: desseleciona
+    formaSelecionada = null;
+    alcaArrastando = null;
+  }
+  function moverSelecaoOuArrasto(e){
+    if(!formaSelecionada || !arrastarInicio) return;
+    const p = posicao(e);
+    aplicarArrastoGenerico(formaSelecionada, formaInicioSnapshot, alcaArrastando, p.x-arrastarInicio.x, p.y-arrastarInicio.y);
+  }
+  function finalizarSelecaoOuArrasto(){
+    arrastarInicio = null;
+    formaInicioSnapshot = null;
+    alcaArrastando = null;
+  }
+
+
+  // Apontador tipo laser: roda em paralelo às ferramentas de desenho, então
+  // funciona mesmo com "Mover" selecionado ou entre um clique e outro.
+  tela.addEventListener('pointermove', e => {
+    if(!apontadorAtivo || !video.src) return;
+    registrarPontoApontador(trilhaApontador, posicao(e));
+  });
+  tela.addEventListener('pointerleave', () => { trilhaApontador = []; });
+
+  // ---------- Ferramentas, cores, editar ----------
+  // A barra de ferramentas é compartilhada pelos dois modos (1 câmera e 2
+  // câmeras): a ferramenta/cor escolhida vale para o modo que estiver ativo.
+  document.querySelectorAll('[data-fer]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-fer]').forEach(x => x.classList.remove('ativo'));
+    b.classList.add('ativo');
+    ferramenta = b.dataset.fer;
+    pontosAngulo = [];
+    pontosAnguloA = []; pontosAnguloB = [];
+    formaSelecionada = null; alcaArrastando = null;
+    formaSelecionadaDuo = null; camSelecionadaDuo = null; alcaArrastandoDuo = null;
+    tela.classList.toggle('modo-mao', ferramenta === 'mao');
+    telaA.classList.toggle('modo-mao', ferramenta === 'mao');
+    telaB.classList.toggle('modo-mao', ferramenta === 'mao');
+    if(ferramenta === 'angulo') mostrarDicaAtual('Ângulo: clique em 3 pontos — extremidade, vértice (articulação), extremidade');
+    else if(ferramenta === 'rastro') mostrarDicaAtual('Rastro: pause perto do início do golpe e clique na bola. A cada clique avanço 1 quadro sozinho.');
+    else if(ferramenta === 'zoom') mostrarDicaAtual('Zoom: clique onde quer aproximar (2×, 3×, 4×). Esc volta ao normal.');
+    else if(ferramenta === 'texto') mostrarDicaAtual('Texto: clique onde quer escrever (clicar num texto já existente edita ele). Clique fora ou saia do campo pra confirmar; Esc cancela.');
+    else if(ferramenta === 'mao') mostrarDicaAtual('Mover: clique numa marcação pra selecionar. Arraste o corpo pra mover, ou as alças brancas pra ajustar. Delete apaga a selecionada.');
+    else esconderDicaAtual();
+  }));
+  document.querySelectorAll('.cor').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.cor').forEach(x => x.classList.remove('ativa'));
+    b.classList.add('ativa');
+    cor = b.dataset.cor;
+  }));
+  document.getElementById('btnDesfazer').addEventListener('click', desfazer);
+  document.getElementById('btnLimpar').addEventListener('click', limpar);
+  const btnApontador = document.getElementById('btnApontador');
+  btnApontador.addEventListener('click', alternarApontador);
+  function alternarApontador(){
+    apontadorAtivo = !apontadorAtivo;
+    btnApontador.classList.toggle('ativo', apontadorAtivo);
+    if(!apontadorAtivo){ trilhaApontador = []; trilhaApontadorA = []; trilhaApontadorB = []; }
+  }
+  function desfazer(){
+    if(modoAtual === '2cam'){
+      // Anotações são independentes por câmera: desfaz na última câmera onde
+      // o coach desenhou (rastreado em ultimaCamDuo a cada traço novo).
+      if(!ultimaCamDuo) return;
+      if(ultimaCamDuo === 'A'){
+        if(ferramenta === 'rastro' && rastroA.length) rastroA.pop();
+        else anotacoesA.pop();
+      } else {
+        if(ferramenta === 'rastro' && rastroB.length) rastroB.pop();
+        else anotacoesB.pop();
+      }
+    } else {
+      if(ferramenta === 'rastro' && rastro.length) rastro.pop();
+      else anotacoes.pop();
+    }
+  }
+  function limpar(){
+    if(modoAtual === '2cam'){
+      anotacoesA = []; pontosAnguloA = []; rastroA = [];
+      anotacoesB = []; pontosAnguloB = []; rastroB = [];
+      ultimaCamDuo = null;
+      formaSelecionadaDuo = null; camSelecionadaDuo = null; alcaArrastandoDuo = null;
+    }
+    else {
+      anotacoes = []; pontosAngulo = []; rastro = [];
+      formaSelecionada = null; alcaArrastando = null;
+    }
+  }
+  function mostrarDica(t){ dica.textContent = t; dica.classList.add('visivel'); }
+  function esconderDica(){ dica.classList.remove('visivel'); }
+  function mostrarDicaAtual(t){ modoAtual === '2cam' ? mostrarDicaDuo(t) : mostrarDica(t); }
+  function esconderDicaAtual(){ modoAtual === '2cam' ? esconderDicaDuo() : esconderDica(); }
+
+  // ---------- Reprodução ----------
+  function alternarPlay(){
+    if(!video.src) return;
+    video.paused ? video.play() : video.pause();
+  }
+  btnPlay.addEventListener('click', alternarPlay);
+  video.addEventListener('play', () => { icoPlay.style.display='none'; icoPause.style.display='block'; });
+  video.addEventListener('pause', () => { icoPlay.style.display='block'; icoPause.style.display='none'; });
+
+  function passoQuadro(dir){
+    if(!video.src) return;
+    video.pause();
+    video.currentTime = Math.min(Math.max(video.currentTime + dir/FPS, 0), video.duration || 0);
+  }
+  document.getElementById('btnQuadroTras').addEventListener('click', () => passoQuadro(-1));
+  document.getElementById('btnQuadroFrente').addEventListener('click', () => passoQuadro(1));
+
+  document.querySelectorAll('.btn-vel').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.btn-vel').forEach(x => x.classList.remove('ativo'));
+    b.classList.add('ativo');
+    video.playbackRate = parseFloat(b.dataset.vel);
+  }));
+  document.querySelectorAll('.btn-fps').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.btn-fps').forEach(x => x.classList.remove('ativo'));
+    b.classList.add('ativo');
+    FPS = parseInt(b.dataset.fps, 10);
+  }));
+
+  // ---------- Linha do tempo ----------
+  function fmt(s){
+    if(!isFinite(s)) s = 0;
+    const m = Math.floor(s/60), seg = s % 60;
+    return String(m).padStart(2,'0') + ':' + seg.toFixed(2).padStart(5,'0');
+  }
+  function atualizarTempo(){
+    tempoEl.textContent = fmt(video.currentTime) + ' / ' + fmt(video.duration);
+    if(video.duration){
+      const pct = (video.currentTime / video.duration) * 1000;
+      barra.value = pct;
+      barra.style.setProperty('--prog', (pct/10) + '%');
+    }
+  }
+  barra.addEventListener('input', () => {
+    if(video.duration) video.currentTime = (barra.value/1000) * video.duration;
+  });
+
+  // ---------- Tela cheia / modo limpo ----------
+  document.getElementById('btnTelaCheia').addEventListener('click', alternarTelaCheia);
+  function alternarTelaCheia(){
+    if(!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  }
+  document.addEventListener('fullscreenchange', () => setTimeout(() => { ajustarTela(); ajustarTelaDuo(); }, 60));
+  const btnModoLimpo = document.getElementById('btnModoLimpo');
+  btnModoLimpo.addEventListener('click', alternarModoLimpo);
+  function alternarModoLimpo(){
+    document.body.classList.toggle('limpo');
+    const ativo = document.body.classList.contains('limpo');
+    btnModoLimpo.classList.toggle('ativo', ativo);
+    duoModoLimpoBtn.classList.toggle('ativo', ativo);
+    setTimeout(() => { ajustarTela(); ajustarTelaDuo(); }, 60);
+  }
+
+  // ================================================================
+  // GRAVAÇÃO EMBUTIDA (sem OBS)
+  // Como funciona: um canvas invisível na resolução original do vídeo
+  // recebe, a cada quadro, o vídeo + todas as anotações. Esse canvas
+  // vira um "fluxo de vídeo" (captureStream). O microfone do coach e o
+  // áudio do próprio vídeo são misturados com Web Audio. O MediaRecorder
+  // junta tudo e gera um arquivo .webm para download.
+  // ================================================================
+  const btnGravar = document.getElementById('btnGravar');
+  const txtGravar = document.getElementById('txtGravar');
+  const tempoRec = document.getElementById('tempoRec');
+  const avisoDownload = document.getElementById('avisoDownload');
+  let gravador = null, pedacos = [], canvasRec = null, ctxRec = null;
+  let audioCtx = null, fonteVideo = null, micStream = null, micGain = null;
+  let fonteVideoA = null, fonteVideoB = null; // fontes de áudio dos vídeos no modo 2 câmeras (só podem ser criadas uma vez por vídeo)
+
+  // ---- Mixer de áudio ----
+  // Volume do vídeo: mexe direto no player, então vale para a escuta E para a
+  // gravação (o som que entra na gravação já sai com esse volume aplicado).
+  // Volume do mic: passa por um "nó de ganho" que só afeta a gravação
+  // (o coach não ouve a própria voz, evitando eco/microfonia).
+  const volVideo = document.getElementById('volVideo');
+  const volMic = document.getElementById('volMic');
+  video.volume = volVideo.value / 100;
+  volVideo.addEventListener('input', () => { video.volume = volVideo.value / 100; });
+  volMic.addEventListener('input', () => { if(micGain) micGain.gain.value = volMic.value / 100; });
+  let animRec = null, inicioRec = 0, timerRec = null;
+  let emGravacao = false;      // estado controlado por nós, não pelo navegador
+  let preparandoRec = false;   // evita clique duplo enquanto pede o microfone
+
+  // ---- Pasta de destino e formato de saída ----
+  let pastaHandle = null;          // pasta escolhida pelo coach (File System Access)
+  let arquivoEscolhido = null;     // alternativa: "salvar como" escolhido na hora de parar
+  let extensao = 'webm';           // definida na hora de gravar (mp4 se o navegador suportar)
+  const suportaPasta = 'showDirectoryPicker' in window;
+  const suportaSalvarComo = 'showSaveFilePicker' in window;
+
+  const btnPasta = document.getElementById('btnPasta');
+  const txtPasta = document.getElementById('txtPasta');
+  if(!suportaPasta) btnPasta.style.display = 'none'; // navegador sem suporte: some o botão
+  btnPasta.addEventListener('click', async () => {
+    try{
+      pastaHandle = await window.showDirectoryPicker({ mode:'readwrite' });
+      txtPasta.textContent = 'Salvar em: ' + pastaHandle.name;
+      btnPasta.classList.add('ativo');
+      mostrarDica('Gravações serão salvas direto na pasta "' + pastaHandle.name + '"');
+      setTimeout(esconderDica, 3000);
+    }catch(e){ /* usuário cancelou a escolha, sem problema */ }
+  });
+
+  btnGravar.addEventListener('click', () => {
+    if(preparandoRec) return;              // ainda pedindo permissão do mic
+    if(emGravacao) pararGravacao();
+    else if(modoAtual === '2cam') iniciarGravacaoDuo();
+    else iniciarGravacao();
+  });
+
+  async function iniciarGravacao(){
+    if(!video.src){ mostrarDica('Carregue um vídeo antes de gravar'); setTimeout(esconderDica,2500); return; }
+    if(typeof MediaRecorder === 'undefined'){ alert('Seu navegador não suporta gravação. Use Chrome ou Edge atualizados.'); return; }
+    preparandoRec = true;
+
+    // 1) Pedir o microfone do coach
+    try{
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio:{ echoCancellation:true, noiseSuppression:true }
+      });
+    }catch(err){
+      preparandoRec = false;
+      alert('Não consegui acessar o microfone. Verifique a permissão do navegador.');
+      return;
+    }
+
+    // 2) Canvas de gravação na resolução nativa do vídeo
+    const W = video.videoWidth || 1280, H = video.videoHeight || 720;
+    canvasRec = document.createElement('canvas');
+    canvasRec.width = W; canvasRec.height = H;
+    ctxRec = canvasRec.getContext('2d');
+    const escala = W / telaW; // traços proporcionais
+
+    function quadroRec(){
+      if(zoom.z > 1){
+        // Desenha só a região ampliada, exatamente como o coach está vendo
+        const sw = W / zoom.z, sh = H / zoom.z;
+        const sx = zoom.lx * W, sy = zoom.ly * H;
+        ctxRec.setTransform(1,0,0,1,0,0);
+        ctxRec.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
+        ctxRec.setTransform(zoom.z, 0, 0, zoom.z, -sx*zoom.z, -sy*zoom.z);
+        desenharTudo(ctxRec, W, H, escala, video.currentTime || 0);
+        ctxRec.setTransform(1,0,0,1,0,0);
+      } else {
+        ctxRec.setTransform(1,0,0,1,0,0);
+        ctxRec.drawImage(video, 0, 0, W, H);
+        desenharTudo(ctxRec, W, H, escala, video.currentTime || 0);
+      }
+      desenharWebcamPip(ctxRec, W, H);
+      animRec = requestAnimationFrame(quadroRec);
+    }
+    quadroRec();
+
+    // 3) Misturar microfone + áudio do vídeo
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
+    const destino = audioCtx.createMediaStreamDestination();
+    const mic = audioCtx.createMediaStreamSource(micStream);
+    micGain = audioCtx.createGain();
+    micGain.gain.value = volMic.value / 100;
+    mic.connect(micGain);
+    micGain.connect(destino);
+    try{
+      if(!fonteVideo){
+        fonteVideo = audioCtx.createMediaElementSource(video);
+        fonteVideo.connect(audioCtx.destination); // continuar ouvindo o som do vídeo
+      }
+      fonteVideo.connect(destino); // e mandar o som do vídeo para a gravação
+    }catch(e){ /* alguns navegadores bloqueiam; segue só com o microfone */ }
+
+    // 4) Juntar imagem + áudio e gravar
+    const fluxo = new MediaStream([
+      ...canvasRec.captureStream(30).getVideoTracks(),
+      ...destino.stream.getAudioTracks()
+    ]);
+    // Tenta MP4 primeiro (H.264 + AAC, o formato universal).
+    // Se o navegador não souber gravar MP4, usa WebM como plano B.
+    const candidatos = [
+      { mime:'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext:'mp4' },
+      { mime:'video/mp4;codecs=avc1,mp4a.40.2',        ext:'mp4' },
+      { mime:'video/mp4',                              ext:'mp4' },
+      { mime:'video/webm;codecs=vp9,opus',             ext:'webm' },
+      { mime:'video/webm;codecs=vp8,opus',             ext:'webm' },
+      { mime:'video/webm',                             ext:'webm' }
+    ];
+    const escolhido = candidatos.find(c => MediaRecorder.isTypeSupported(c.mime)) || candidatos[candidatos.length-1];
+    extensao = escolhido.ext;
+    pedacos = [];
+    gravador = new MediaRecorder(fluxo, { mimeType:escolhido.mime, videoBitsPerSecond: 8_000_000 });
+    gravador.ondataavailable = e => { if(e.data.size) pedacos.push(e.data); };
+    gravador.onstop = salvarGravacao;
+    gravador.onerror = () => {          // se o gravador falhar, encerramos limpo
+      avisar('Ocorreu um erro na gravação. Tente novamente; se persistir, atualize o Chrome/Edge.');
+      pararGravacao();
+    };
+    gravador.start();                    // sem fatiar em pedaços: mais estável para MP4
+    emGravacao = true;
+    preparandoRec = false;
+
+    // 5) Interface
+    btnGravar.classList.add('gravando');
+    txtGravar.textContent = 'Parar (R)';
+    inicioRec = Date.now();
+    timerRec = setInterval(() => {
+      const s = Math.floor((Date.now()-inicioRec)/1000);
+      tempoRec.textContent = '● ' + String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+    }, 500);
+    mostrarDica('Gravando com narração — a gravação captura o vídeo e as anotações, sem os painéis');
+    setTimeout(esconderDica, 3500);
+  }
+
+  // Gravação do modo 2 câmeras: monta um canvas com as duas câmeras lado a
+  // lado (cada uma na sua resolução nativa), com as anotações de cada uma
+  // desenhadas na sua própria metade, e mistura o microfone com o áudio dos vídeos.
+  async function iniciarGravacaoDuo(){
+    if(!videoA.src || !videoB.src){ mostrarDicaDuo('Carregue os dois vídeos antes de gravar'); setTimeout(esconderDicaDuo,2500); return; }
+    if(typeof MediaRecorder === 'undefined'){ alert('Seu navegador não suporta gravação. Use Chrome ou Edge atualizados.'); return; }
+    preparandoRec = true;
+
+    try{
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio:{ echoCancellation:true, noiseSuppression:true }
+      });
+    }catch(err){
+      preparandoRec = false;
+      alert('Não consegui acessar o microfone. Verifique a permissão do navegador.');
+      return;
+    }
+
+    // Canvas composto: no layout "lado a lado" as duas câmeras ficam uma do
+    // lado da outra, cada uma na própria resolução nativa; nos layouts "só
+    // A"/"só B" a gravação captura apenas a câmera visível, em tela cheia —
+    // a gravação sempre acompanha o que está sendo mostrado na tela.
+    const WA = videoA.videoWidth || 1280, HA = videoA.videoHeight || 720;
+    const WB = videoB.videoWidth || 1280, HB = videoB.videoHeight || 720;
+    let W, H;
+    if(layoutDuo === 'A'){ W = WA; H = HA; }
+    else if(layoutDuo === 'B'){ W = WB; H = HB; }
+    else { W = WA + WB; H = Math.max(HA, HB); }
+    canvasRec = document.createElement('canvas');
+    canvasRec.width = W; canvasRec.height = H;
+    ctxRec = canvasRec.getContext('2d');
+    const escalaA = WA / telaWA, escalaB = WB / telaWB;
+
+    // Desenha uma câmera no canvas de gravação, deslocada por xOffset —
+    // reaproveitada tanto pro layout lado a lado quanto pro de uma câmera só.
+    function desenharCameraNaGravacao(cam, xOffset, Wc, Hc, escalaC){
+      const v = cam === 'A' ? videoA : videoB;
+      const t = (cam === 'A' ? videoA.currentTime : videoB.currentTime) || 0;
+      if(zoomDuo.z > 1){
+        const sw = Wc/zoomDuo.z, sh = Hc/zoomDuo.z;
+        const sx = zoomDuo.lx*Wc, sy = zoomDuo.ly*Hc;
+        ctxRec.setTransform(1,0,0,1,xOffset,0);
+        ctxRec.drawImage(v, sx, sy, sw, sh, 0, 0, Wc, Hc);
+        ctxRec.setTransform(zoomDuo.z, 0, 0, zoomDuo.z, xOffset - sx*zoomDuo.z, -sy*zoomDuo.z);
+        desenharTudoDuo(ctxRec, Wc, Hc, escalaC, t, cam);
+      } else {
+        ctxRec.setTransform(1,0,0,1,xOffset,0);
+        ctxRec.drawImage(v, 0, 0, Wc, Hc);
+        desenharTudoDuo(ctxRec, Wc, Hc, escalaC, t, cam);
+      }
+      ctxRec.setTransform(1,0,0,1,0,0);
+    }
+
+    function quadroRecDuo(){
+      ctxRec.setTransform(1,0,0,1,0,0);
+      ctxRec.fillStyle = '#000';
+      ctxRec.fillRect(0,0,W,H);
+
+      if(layoutDuo === 'A'){
+        desenharCameraNaGravacao('A', 0, WA, HA, escalaA);
+      } else if(layoutDuo === 'B'){
+        desenharCameraNaGravacao('B', 0, WB, HB, escalaB);
+      } else {
+        desenharCameraNaGravacao('A', 0, WA, HA, escalaA);
+        desenharCameraNaGravacao('B', WA, WB, HB, escalaB);
+      }
+
+      desenharWebcamPip(ctxRec, W, H);
+      animRec = requestAnimationFrame(quadroRecDuo);
+    }
+    quadroRecDuo();
+
+    // Mixagem de áudio: microfone + áudio da câmera A + áudio da câmera B
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
+    const destino = audioCtx.createMediaStreamDestination();
+    const mic = audioCtx.createMediaStreamSource(micStream);
+    micGain = audioCtx.createGain();
+    micGain.gain.value = duoVolMic.value / 100;
+    mic.connect(micGain);
+    micGain.connect(destino);
+    try{
+      if(!fonteVideoA){
+        fonteVideoA = audioCtx.createMediaElementSource(videoA);
+        fonteVideoA.connect(audioCtx.destination);
+      }
+      fonteVideoA.connect(destino);
+    }catch(e){ /* alguns navegadores bloqueiam; segue sem esse áudio */ }
+    // Câmera B só entra na mixagem se o coach tiver ativado o áudio dela
+    // (por padrão fica muda para não duplicar/ecoar o som da Câmera A).
+    if(!videoB.muted){
+      try{
+        if(!fonteVideoB){
+          fonteVideoB = audioCtx.createMediaElementSource(videoB);
+          fonteVideoB.connect(audioCtx.destination);
+        }
+        fonteVideoB.connect(destino);
+      }catch(e){ /* idem */ }
+    }
+
+    const fluxo = new MediaStream([
+      ...canvasRec.captureStream(30).getVideoTracks(),
+      ...destino.stream.getAudioTracks()
+    ]);
+    const candidatos = [
+      { mime:'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext:'mp4' },
+      { mime:'video/mp4;codecs=avc1,mp4a.40.2',        ext:'mp4' },
+      { mime:'video/mp4',                              ext:'mp4' },
+      { mime:'video/webm;codecs=vp9,opus',             ext:'webm' },
+      { mime:'video/webm;codecs=vp8,opus',             ext:'webm' },
+      { mime:'video/webm',                             ext:'webm' }
+    ];
+    const escolhido = candidatos.find(c => MediaRecorder.isTypeSupported(c.mime)) || candidatos[candidatos.length-1];
+    extensao = escolhido.ext;
+    pedacos = [];
+    gravador = new MediaRecorder(fluxo, { mimeType:escolhido.mime, videoBitsPerSecond: 8_000_000 });
+    gravador.ondataavailable = e => { if(e.data.size) pedacos.push(e.data); };
+    gravador.onstop = salvarGravacao;
+    gravador.onerror = () => {
+      avisar('Ocorreu um erro na gravação. Tente novamente; se persistir, atualize o Chrome/Edge.');
+      pararGravacao();
+    };
+    gravador.start();
+    emGravacao = true;
+    preparandoRec = false;
+
+    btnGravar.classList.add('gravando');
+    txtGravar.textContent = 'Parar (R)';
+    inicioRec = Date.now();
+    timerRec = setInterval(() => {
+      const s = Math.floor((Date.now()-inicioRec)/1000);
+      tempoRec.textContent = '● ' + String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+    }, 500);
+    const msgGravacao = layoutDuo === 'A'
+      ? 'Gravando a Câmera A com narração'
+      : layoutDuo === 'B'
+        ? 'Gravando a Câmera B com narração'
+        : 'Gravando as duas câmeras com narração — a gravação junta as duas lado a lado, sem os painéis';
+    mostrarDicaDuo(msgGravacao);
+    setTimeout(esconderDicaDuo, 3500);
+  }
+
+  function nomeArquivoGravacao(){
+    const base = (nomeArquivo.textContent || 'video').replace(/\.[^.]+$/,'').replace(/[^\w\-]+/g,'-').slice(0,40);
+    const data = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+    return 'analise-' + base + '-' + data + '.' + extensao;
+  }
+
+  function pararGravacao(){
+    emGravacao = false;
+    preparandoRec = false;
+    // Se não há pasta definida, abrimos o "Salvar como" AGORA, porque os
+    // navegadores só permitem abrir esse diálogo durante um clique/tecla.
+    if(!pastaHandle && suportaSalvarComo){
+      arquivoEscolhido = window.showSaveFilePicker({
+        suggestedName: nomeArquivoGravacao(),
+        types:[{ description:'Vídeo da análise', accept:{ ['video/'+ (extensao==='mp4'?'mp4':'webm')]: ['.'+extensao] } }]
+      }).catch(() => null); // se cancelar, cai no download comum
+    }
+    if(gravador && gravador.state === 'recording') gravador.stop();
+    if(animRec) cancelAnimationFrame(animRec);
+    if(micStream) micStream.getTracks().forEach(t => t.stop());
+    clearInterval(timerRec);
+    tempoRec.textContent = '';
+    btnGravar.classList.remove('gravando');
+    txtGravar.textContent = 'Gravar análise';
+  }
+
+  async function salvarGravacao(){
+    const tipo = extensao === 'mp4' ? 'video/mp4' : 'video/webm';
+    const blob = new Blob(pedacos, {type:tipo});
+    const nome = nomeArquivoGravacao();
+
+    // Caminho 1: pasta de destino definida -> grava direto nela
+    if(pastaHandle){
+      try{
+        const fh = await pastaHandle.getFileHandle(nome, {create:true});
+        const w = await fh.createWritable();
+        await w.write(blob); await w.close();
+        avisar('Gravação salva em <b>' + pastaHandle.name + '/' + nome + '</b>' + notaFormato());
+        return;
+      }catch(e){ /* permissão perdida? cai para os próximos caminhos */ }
+    }
+    // Caminho 2: o coach escolheu local no diálogo "Salvar como"
+    if(arquivoEscolhido){
+      try{
+        const fh = await arquivoEscolhido;
+        arquivoEscolhido = null;
+        if(fh){
+          const w = await fh.createWritable();
+          await w.write(blob); await w.close();
+          avisar('Gravação salva como <b>' + fh.name + '</b> no local escolhido' + notaFormato());
+          return;
+        }
+      }catch(e){ arquivoEscolhido = null; }
+    }
+    // Caminho 3: download comum na pasta Downloads
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = nome;
+    document.body.appendChild(a); a.click(); a.remove();
+    avisar('Gravação salva como <b>' + nome + '</b> na pasta Downloads' + notaFormato());
+  }
+  function notaFormato(){
+    return extensao === 'mp4'
+      ? '.<br>Formato <b>MP4</b>: abre em qualquer lugar (WhatsApp, celular, editores).'
+      : '.<br>Este navegador não grava MP4, então salvei em <b>WebM</b> (abre no Chrome, Edge e VLC). Para MP4 nativo, use Chrome ou Edge atualizados.';
+  }
+  function avisar(html){
+    avisoDownload.innerHTML = html;
+    avisoDownload.classList.add('visivel');
+    setTimeout(() => avisoDownload.classList.remove('visivel'), 12000);
+  }
+
+  // ================================================================
+  // WEBCAM DO COACH (picture-in-picture)
+  // Uma única captura (getUserMedia, só vídeo) alimenta os dois <video> de
+  // preview — um em cada modo — já que os dois podem receber o mesmo
+  // MediaStream ao mesmo tempo. O que aparece na tela é só o que estiver
+  // visível (o outro modo fica com display:none). A gravação desenha essa
+  // mesma imagem no canto do canvas via desenharWebcamPip().
+  // ================================================================
+  const webcamPreview1 = document.getElementById('webcamPreview1');
+  const webcamPreview2 = document.getElementById('webcamPreview2');
+  const btnWebcam = document.getElementById('btnWebcam');
+  const txtWebcam = document.getElementById('txtWebcam');
+
+  btnWebcam.addEventListener('click', async () => {
+    if(webcamStream){
+      desligarWebcam();
+      return;
+    }
+    btnWebcam.disabled = true;
+    try{
+      webcamStream = await navigator.mediaDevices.getUserMedia({
+        video:{ width:{ideal:320}, height:{ideal:240} },
+        audio:false
+      });
+    }catch(err){
+      alert('Não consegui acessar sua webcam. Verifique a permissão do navegador.');
+      btnWebcam.disabled = false;
+      return;
+    }
+    webcamPreview1.srcObject = webcamStream;
+    webcamPreview2.srcObject = webcamStream;
+    webcamPreview1.style.display = 'block';
+    webcamPreview2.style.display = 'block';
+    btnWebcam.classList.add('ativo');
+    txtWebcam.textContent = 'Webcam ligada';
+    btnWebcam.disabled = false;
+    // recalcula a posição/tamanho já com o vídeo atual (senão só se ajusta
+    // no próximo resize/troca de vídeo)
+    ajustarTela();
+    ajustarTelaDuo();
+  });
+
+  function desligarWebcam(){
+    if(webcamStream) webcamStream.getTracks().forEach(t => t.stop());
+    webcamStream = null;
+    webcamPreview1.srcObject = null; webcamPreview1.style.display = 'none';
+    webcamPreview2.srcObject = null; webcamPreview2.style.display = 'none';
+    btnWebcam.classList.remove('ativo');
+    txtWebcam.textContent = 'Webcam';
+  }
+
+  // ================================================================
+  // MODO 2 CÂMERAS — comparar dois ângulos do mesmo golpe lado a lado
+  // ================================================================
+  // Reaproveita a mesma barra de ferramentas (caneta, linha, ângulo, rastro,
+  // zoom, cor) e o mesmo botão de gravar do modo 1 câmera. As anotações
+  // (caneta, linha, seta, círculo, ângulo, rastro) são INDEPENDENTES por
+  // câmera: o que é desenhado na Câmera A fica só na A, e vice-versa. O
+  // zoom continua espelhado nas duas, por ser só enquadramento visual.
+  const btnModo2Cam = document.getElementById('btnModo2Cam');
+  const txtModo2Cam = document.getElementById('txtModo2Cam');
+  const envoltorio1Cam = document.getElementById('envoltorio1Cam');
+  const duoEnvoltorio = document.getElementById('duoEnvoltorio');
+  const btnTrocarVideoHeader = document.getElementById('btnTrocarVideo');
+
+  const videoA = document.getElementById('videoA');
+  const videoB = document.getElementById('videoB');
+  const telaA = document.getElementById('telaA');
+  const telaB = document.getElementById('telaB');
+  const ctxTelaA = telaA.getContext('2d');
+  const ctxTelaB = telaB.getContext('2d');
+  const zoomWrapA = document.getElementById('zoomWrapA');
+  const zoomWrapB = document.getElementById('zoomWrapB');
+  const zoomChipA = document.getElementById('zoomChipA');
+  const zoomChipB = document.getElementById('zoomChipB');
+  const areaEnvioA = document.getElementById('areaEnvioA');
+  const areaEnvioB = document.getElementById('areaEnvioB');
+  const inputA = document.querySelector('[data-cam-input="A"]');
+  const inputB = document.querySelector('[data-cam-input="B"]');
+  const dicaDuo = document.getElementById('dicaDuo');
+
+  const duoBarra = document.getElementById('duoBarra');
+  const duoTempoEl = document.getElementById('duoTempo');
+  const duoBarraA = document.getElementById('duoBarraA');
+  const duoBarraB = document.getElementById('duoBarraB');
+  const duoTempoAEl = document.getElementById('duoTempoA');
+  const duoTempoBEl = document.getElementById('duoTempoB');
+  const duoBtnPlay = document.getElementById('duoBtnPlay');
+  const duoIcoPlay = document.getElementById('duoIcoPlay');
+  const duoIcoPause = document.getElementById('duoIcoPause');
+  const duoBtnQuadroTras = document.getElementById('duoBtnQuadroTras');
+  const duoBtnQuadroFrente = document.getElementById('duoBtnQuadroFrente');
+  const duoDefValor = document.getElementById('duoDefValor');
+  const duoDefMenos = document.getElementById('duoDefMenos');
+  const duoDefMais = document.getElementById('duoDefMais');
+  const duoSincAgora = document.getElementById('duoSincAgora');
+  const duoModoLimpoBtn = document.getElementById('duoModoLimpo');
+  const duoVolA = document.getElementById('duoVolA');
+  const duoVolMic = document.getElementById('duoVolMic');
+  const duoMuteB = document.getElementById('duoMuteB');
+
+  // Por padrão a Câmera B fica sem áudio: como as duas câmeras normalmente
+  // captam o mesmo som ambiente (raquete, bola, voz), tocar as duas juntas
+  // gera eco. A Câmera A é a referência de áudio; o coach pode ativar o som
+  // da B a qualquer momento se preferir usar o áudio dela.
+  videoB.muted = true;
+  videoA.volume = duoVolA.value / 100;
+  duoVolA.addEventListener('input', () => { videoA.volume = duoVolA.value / 100; });
+  duoVolMic.addEventListener('input', () => { if(micGain) micGain.gain.value = duoVolMic.value / 100; });
+  duoMuteB.addEventListener('click', () => {
+    videoB.muted = !videoB.muted;
+    duoMuteB.textContent = videoB.muted ? '🔇 Câmera B' : '🔊 Câmera B';
+    duoMuteB.classList.toggle('ativo', !videoB.muted);
+    duoMuteB.title = videoB.muted
+      ? 'Câmera B está sem áudio (evita eco de duas câmeras captando o mesmo som). Clique para ativar.'
+      : 'Câmera B com áudio ativado. Clique para silenciar novamente.';
+  });
+
+  // ---- Estado das anotações: INDEPENDENTE por câmera (cada uma com seus
+  // próprios traços, ângulos e rastro). O zoom continua espelhado, já que é
+  // só um enquadramento visual, não uma marcação sobre o golpe.
+  let telaWA = 1, telaHA = 1, telaWB = 1, telaHB = 1;
+  let anotacoesA = [], anotacoesB = [];
+  let formaAtualA = null, formaAtualB = null;
+  let pontosAnguloA = [], pontosAnguloB = [];
+  let rastroA = [], rastroB = [];
+  let corRastroA = '#D8F000', corRastroB = '#D8F000';
+  let ultimaCamDuo = null; // 'A' ou 'B': qual câmera recebeu o último traço (para o botão Desfazer)
+  let trilhaApontadorA = [], trilhaApontadorB = []; // apontador tipo laser, independente por câmera
+  let defasagem = 0; // segundos: tempo(B) = tempo(A) + defasagem
+  const zoomDuo = { z:1, cx:.5, cy:.5, lx:0, ly:0 };
+
+  // Layout de exibição dentro do modo 2 câmeras. IMPORTANTE pra performance:
+  // fora do "ambas", a câmera escondida fica REALMENTE PAUSADA (não decodifica
+  // em segundo plano) — só é re-sincronizada (um seek pontual) no instante em
+  // que você troca de novo. Isso evita decodificar dois vídeos de alto frame
+  // rate (ex: 120fps) ao mesmo tempo quando só um está sendo mostrado.
+  let layoutDuo = 'ambas'; // 'ambas' | 'A' | 'B'
+  const duoColunaA = document.getElementById('duoColunaA');
+  const duoColunaB = document.getElementById('duoColunaB');
+  function aplicarLayoutDuo(layoutAnterior){
+    duoColunaA.style.display = layoutDuo === 'B' ? 'none' : '';
+    duoColunaB.style.display = layoutDuo === 'A' ? 'none' : '';
+    // O zoom é relativo ao tamanho da própria câmera na tela — como trocar de
+    // layout muda esse tamanho (a câmera visível passa a ocupar mais espaço),
+    // um zoom já aplicado ficaria com efeito exagerado/somado. Reseta ao trocar.
+    zerarZoomDuo();
+    // a coluna visível passa a ocupar 100% da largura: recalcula tamanhos
+    setTimeout(ajustarTelaDuo, 30);
+
+    if(!videoA.src || !videoB.src) return; // sem os dois vídeos, não tem o que sincronizar
+
+    const estavaTocando = layoutAnterior === 'B' ? !videoB.paused : !videoA.paused;
+
+    if(layoutDuo === 'ambas'){
+      if(layoutAnterior === 'A') videoB.currentTime = Math.min(Math.max(videoA.currentTime + defasagem, 0), videoB.duration || 0);
+      else if(layoutAnterior === 'B') videoA.currentTime = Math.min(Math.max(videoB.currentTime - defasagem, 0), videoA.duration || 0);
+      if(estavaTocando){ videoA.play(); videoB.play(); } else { videoA.pause(); videoB.pause(); }
+    } else if(layoutDuo === 'A'){
+      if(layoutAnterior === 'B') videoA.currentTime = Math.min(Math.max(videoB.currentTime - defasagem, 0), videoA.duration || 0);
+      videoB.pause();
+      if(estavaTocando) videoA.play(); else videoA.pause();
+    } else { // 'B'
+      if(layoutAnterior === 'A') videoB.currentTime = Math.min(Math.max(videoA.currentTime + defasagem, 0), videoB.duration || 0);
+      videoA.pause();
+      if(estavaTocando) videoB.play(); else videoB.pause();
+    }
+    atualizarIconePlayDuo();
+  }
+  document.querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-ver]').forEach(x => x.classList.remove('ativo'));
+    b.classList.add('ativo');
+    const layoutAnterior = layoutDuo;
+    layoutDuo = b.dataset.ver;
+    aplicarLayoutDuo(layoutAnterior);
+  }));
+
+  // ---- Carregar vídeo de cada câmera ----
+  function carregarArquivoDuo(arq, cam){
+    if(!arq || !arq.type.startsWith('video')) return;
+    const v = cam === 'A' ? videoA : videoB;
+    const envio = cam === 'A' ? areaEnvioA : areaEnvioB;
+    v.src = URL.createObjectURL(arq);
+    if(cam === 'A'){
+      nomeArquivoAtxt = arq.name;
+      anotacoesA = []; pontosAnguloA = []; rastroA = [];
+    } else {
+      nomeArquivoBtxt = arq.name;
+      anotacoesB = []; pontosAnguloB = []; rastroB = [];
+    }
+    atualizarRotuloSessao();
+    envio.style.display = 'none';
+    v.addEventListener('loadedmetadata', ajustarTelaDuo, {once:true});
+  }
+  document.querySelector('[data-cam-btn="A"]').addEventListener('click', () => inputA.click());
+  document.querySelector('[data-cam-btn="B"]').addEventListener('click', () => inputB.click());
+  document.querySelector('[data-cam-trocar="A"]').addEventListener('click', () => inputA.click());
+  document.querySelector('[data-cam-trocar="B"]').addEventListener('click', () => inputB.click());
+  inputA.addEventListener('change', e => carregarArquivoDuo(e.target.files[0], 'A'));
+  inputB.addEventListener('change', e => carregarArquivoDuo(e.target.files[0], 'B'));
+  document.querySelectorAll('.duo-cam').forEach(painel => {
+    const cam = painel.dataset.cam;
+    const envio = cam === 'A' ? areaEnvioA : areaEnvioB;
+    ['dragover','dragenter'].forEach(ev => painel.addEventListener(ev, e => {
+      e.preventDefault(); envio.classList.add('arrastando');
+    }));
+    ['dragleave','drop'].forEach(ev => painel.addEventListener(ev, e => {
+      e.preventDefault(); envio.classList.remove('arrastando');
+    }));
+    painel.addEventListener('drop', e => carregarArquivoDuo(e.dataTransfer.files[0], cam));
+  });
+
+  // ---- Canvas alinhado a cada vídeo ----
+  const duoPalco = document.getElementById('duoPalco');
+  function ajustarTelaDuo(){
+    telaWA = Math.max(1, videoA.offsetWidth); telaHA = Math.max(1, videoA.offsetHeight);
+    telaWB = Math.max(1, videoB.offsetWidth); telaHB = Math.max(1, videoB.offsetHeight);
+    const dpr = window.devicePixelRatio || 1;
+    [[telaA, telaWA, telaHA], [telaB, telaWB, telaHB]].forEach(([t, w, h]) => {
+      t.style.left = '0px'; t.style.top = '0px';
+      t.style.width = w + 'px'; t.style.height = h + 'px';
+      t.width = w * dpr; t.height = h * dpr;
+      t.getContext('2d').setTransform(dpr,0,0,dpr,0,0);
+    });
+    // Webcam em banner centralizado no topo, usando a largura total das duas
+    // câmeras juntas (mesma proporção usada na gravação, ver PROP_WEBCAM_LARGURA)
+    posicionarWebcamPip(webcamPreview2, 0, 0, duoPalco.offsetWidth, duoPalco.offsetHeight);
+  }
+  window.addEventListener('resize', ajustarTelaDuo);
+  new ResizeObserver(ajustarTelaDuo).observe(duoPalco);
+
+  // ---- Zoom digital (espelhado nas duas câmeras) ----
+  function aplicarZoomDuo(){
+    if(zoomDuo.z <= 1){
+      zoomDuo.z = 1; zoomDuo.lx = 0; zoomDuo.ly = 0;
+      zoomWrapA.style.transform = ''; zoomWrapB.style.transform = '';
+      zoomChipA.classList.remove('visivel'); zoomChipB.classList.remove('visivel');
+      return;
+    }
+    const vis = 1/zoomDuo.z;
+    zoomDuo.lx = Math.min(Math.max(zoomDuo.cx - vis/2, 0), 1 - vis);
+    zoomDuo.ly = Math.min(Math.max(zoomDuo.cy - vis/2, 0), 1 - vis);
+    const ox = (zoomDuo.lx / (1 - vis)) * 100;
+    const oy = (zoomDuo.ly / (1 - vis)) * 100;
+    [zoomWrapA, zoomWrapB].forEach(w => {
+      w.style.transformOrigin = ox + '% ' + oy + '%';
+      w.style.transform = 'scale(' + zoomDuo.z + ')';
+    });
+    zoomChipA.textContent = zoomChipB.textContent = 'Zoom ' + zoomDuo.z + '×';
+    zoomChipA.classList.add('visivel'); zoomChipB.classList.add('visivel');
+  }
+  function zerarZoomDuo(){ zoomDuo.z = 1; aplicarZoomDuo(); }
+
+  // ---- Desenho (reaproveita tracar() e tracarRastroGenerico(), que já são
+  // genéricas). cam = 'A' ou 'B' escolhe qual conjunto de anotações desenhar,
+  // já que agora cada câmera tem seus próprios traços.
+  function desenharTudoDuo(ctx, W, H, s, tempoAtual, cam, mostrarSelecao){
+    const anot = cam === 'A' ? anotacoesA : anotacoesB;
+    const forma = cam === 'A' ? formaAtualA : formaAtualB;
+    const rastro = cam === 'A' ? rastroA : rastroB;
+    const corRastroCam = cam === 'A' ? corRastroA : corRastroB;
+    const pts = cam === 'A' ? pontosAnguloA : pontosAnguloB;
+    const trilha = cam === 'A' ? trilhaApontadorA : trilhaApontadorB;
+    anot.forEach(f => tracar(f, ctx, W, H, s));
+    if(forma) tracar(forma, ctx, W, H, s);
+    tracarRastroGenerico(ctx, W, H, s, tempoAtual, rastro, corRastroCam);
+    pts.forEach(p => {
+      ctx.fillStyle = cor;
+      ctx.beginPath(); ctx.arc(p.x*W, p.y*H, 5*s, 0, Math.PI*2); ctx.fill();
+    });
+    if(apontadorAtivo) tracarApontador(ctx, W, H, s, trilha, cor);
+    if(mostrarSelecao && ferramenta === 'mao' && camSelecionadaDuo === cam && formaSelecionadaDuo){
+      desenharSelecao(ctx, W, H, s, formaSelecionadaDuo);
+    }
+  }
+
+  function lacoDuo(){
+    if(modoAtual === '2cam'){
+      if(layoutDuo !== 'B'){
+        ctxTelaA.clearRect(0,0,telaWA,telaHA);
+        desenharTudoDuo(ctxTelaA, telaWA, telaHA, 1, videoA.currentTime || 0, 'A', true);
+      }
+      if(layoutDuo !== 'A'){
+        ctxTelaB.clearRect(0,0,telaWB,telaHB);
+        desenharTudoDuo(ctxTelaB, telaWB, telaHB, 1, videoB.currentTime || 0, 'B', true);
+      }
+      sincronizarReproducaoDuo();
+      atualizarTempoDuo();
+    }
+    requestAnimationFrame(lacoDuo);
+  }
+  requestAnimationFrame(lacoDuo);
+
+  // ---- Interação de desenho: cada câmera tem seu próprio conjunto de
+  // anotações — o que é desenhado na A fica só na A, e vice-versa.
+  function iniciarDesenhoDuo(e, canvasOrigem, cam){
+    if(!videoA.src && !videoB.src) return;
+    if(ferramenta === 'mao'){ iniciarSelecaoOuArrastoDuo(e, canvasOrigem, cam); return; }
+    e.preventDefault();
+    canvasOrigem.setPointerCapture(e.pointerId);
+    const p = posicaoRelativa(e, canvasOrigem);
+    const v = cam === 'A' ? videoA : videoB;
+
+    if(ferramenta === 'zoom'){
+      // Zoom continua espelhado nas duas câmeras (é só enquadramento visual)
+      if(zoomDuo.z >= 4){ zerarZoomDuo(); mostrarDicaDuo('Zoom desativado'); setTimeout(esconderDicaDuo,1500); }
+      else{
+        zoomDuo.z = zoomDuo.z < 2 ? 2 : zoomDuo.z + 1;
+        zoomDuo.cx = p.x; zoomDuo.cy = p.y;
+        aplicarZoomDuo();
+      }
+      return;
+    }
+    ultimaCamDuo = cam; // para o botão "Desfazer" saber em qual câmera mexer
+    if(ferramenta === 'rastro'){
+      videoA.pause(); videoB.pause();
+      const arr = cam === 'A' ? rastroA : rastroB;
+      arr.push({x:p.x, y:p.y, t:v.currentTime});
+      arr.sort((a,b) => a.t - b.t);
+      if(cam === 'A') corRastroA = cor; else corRastroB = cor;
+      mostrarDicaDuo('Ponto ' + arr.length + ' marcado na Câmera ' + cam + ' · avançando 1 quadro só nela…');
+      passoQuadroIndividual(v, 1);
+      return;
+    }
+    if(ferramenta === 'angulo'){
+      const pts = cam === 'A' ? pontosAnguloA : pontosAnguloB;
+      pts.push(p);
+      if(pts.length === 2) mostrarDicaDuo('Agora clique no fim do 2º segmento (Câmera ' + cam + ')');
+      if(pts.length === 3){
+        const shape = {tipo:'angulo', cor, pts:pts.slice()};
+        if(cam === 'A'){ anotacoesA.push(shape); pontosAnguloA = []; }
+        else { anotacoesB.push(shape); pontosAnguloB = []; }
+        esconderDicaDuo();
+      }
+      return;
+    }
+    if(ferramenta === 'texto'){
+      const arrExistente = cam === 'A' ? anotacoesA : anotacoesB;
+      let editouExistente = false;
+      for(let i = arrExistente.length - 1; i >= 0; i--){
+        const fExistente = arrExistente[i];
+        const W = cam === 'A' ? telaWA : telaWB, H = cam === 'A' ? telaHA : telaHB;
+        if(fExistente.tipo === 'texto' && distanciaFormaPx(fExistente, p, W, H) <= TOLERANCIA_SELECAO){
+          abrirEdicaoTexto(e.clientX, e.clientY, fExistente.cor, fExistente.texto, valor => {
+            if(valor) fExistente.texto = valor;
+            else arrExistente.splice(arrExistente.indexOf(fExistente), 1);
+          });
+          editouExistente = true;
+          break;
+        }
+      }
+      if(editouExistente) return;
+      abrirEdicaoTexto(e.clientX, e.clientY, cor, '', valor => {
+        if(!valor) return;
+        const shape = {tipo:'texto', cor, x:p.x, y:p.y, texto:valor};
+        if(cam === 'A') anotacoesA.push(shape); else anotacoesB.push(shape);
+      });
+      return;
+    }
+    const forma = ferramenta === 'caneta'
+      ? {tipo:'caneta', cor, pts:[p]}
+      : {tipo:ferramenta, cor, x1:p.x, y1:p.y, x2:p.x, y2:p.y};
+    if(cam === 'A') formaAtualA = forma; else formaAtualB = forma;
+  }
+  function moverDesenhoDuo(e, canvasOrigem, cam){
+    if(ferramenta === 'mao'){ moverSelecaoOuArrastoDuo(e, canvasOrigem, cam); return; }
+    const forma = cam === 'A' ? formaAtualA : formaAtualB;
+    if(!forma) return;
+    const p = posicaoRelativa(e, canvasOrigem);
+    if(forma.tipo === 'caneta') forma.pts.push(p);
+    else { forma.x2 = p.x; forma.y2 = p.y; }
+  }
+  function finalizarDesenhoDuo(cam){
+    if(ferramenta === 'mao'){ finalizarSelecaoOuArrastoDuo(); return; }
+    if(cam === 'A'){ if(formaAtualA){ anotacoesA.push(formaAtualA); formaAtualA = null; } }
+    else { if(formaAtualB){ anotacoesB.push(formaAtualB); formaAtualB = null; } }
+  }
+
+  // ---- Ferramenta Mover (modo 2 câmeras): seleciona e arrasta/ajusta formas
+  // dentro da câmera em que você clicou (cada câmera tem suas próprias formas)
+  function iniciarSelecaoOuArrastoDuo(e, canvasOrigem, cam){
+    const W = cam === 'A' ? telaWA : telaWB, H = cam === 'A' ? telaHA : telaHB;
+    const p = posicaoRelativa(e, canvasOrigem);
+    if(formaSelecionadaDuo && camSelecionadaDuo === cam){
+      for(const a of alcasDaForma(formaSelecionadaDuo)){
+        const d = Math.hypot((a.x-p.x)*W, (a.y-p.y)*H);
+        if(d <= TOLERANCIA_SELECAO){
+          alcaArrastandoDuo = a.ref;
+          arrastarInicioDuo = p;
+          formaInicioSnapshotDuo = JSON.parse(JSON.stringify(formaSelecionadaDuo));
+          canvasOrigem.setPointerCapture(e.pointerId);
+          return;
+        }
+      }
+    }
+    const arr = cam === 'A' ? anotacoesA : anotacoesB;
+    for(let i = arr.length - 1; i >= 0; i--){
+      if(distanciaFormaPx(arr[i], p, W, H) <= TOLERANCIA_SELECAO){
+        formaSelecionadaDuo = arr[i];
+        camSelecionadaDuo = cam;
+        alcaArrastandoDuo = null;
+        arrastarInicioDuo = p;
+        formaInicioSnapshotDuo = JSON.parse(JSON.stringify(arr[i]));
+        canvasOrigem.setPointerCapture(e.pointerId);
+        return;
+      }
+    }
+    formaSelecionadaDuo = null;
+    camSelecionadaDuo = null;
+    alcaArrastandoDuo = null;
+  }
+  function moverSelecaoOuArrastoDuo(e, canvasOrigem, cam){
+    if(!formaSelecionadaDuo || camSelecionadaDuo !== cam || !arrastarInicioDuo) return;
+    const p = posicaoRelativa(e, canvasOrigem);
+    aplicarArrastoGenerico(formaSelecionadaDuo, formaInicioSnapshotDuo, alcaArrastandoDuo, p.x-arrastarInicioDuo.x, p.y-arrastarInicioDuo.y);
+  }
+  function finalizarSelecaoOuArrastoDuo(){
+    arrastarInicioDuo = null;
+    formaInicioSnapshotDuo = null;
+    alcaArrastandoDuo = null;
+  }
+
+  telaA.addEventListener('pointerdown', e => iniciarDesenhoDuo(e, telaA, 'A'));
+  telaB.addEventListener('pointerdown', e => iniciarDesenhoDuo(e, telaB, 'B'));
+  telaA.addEventListener('pointermove', e => moverDesenhoDuo(e, telaA, 'A'));
+  telaB.addEventListener('pointermove', e => moverDesenhoDuo(e, telaB, 'B'));
+  telaA.addEventListener('pointerup', () => finalizarDesenhoDuo('A'));
+  telaB.addEventListener('pointerup', () => finalizarDesenhoDuo('B'));
+  // Duplo clique num texto existente com "Mover" selecionado reabre pra editar
+  // (com a ferramenta "Texto" isso já acontece no próprio clique único)
+  function dblclickTextoDuo(e, canvasOrigem, cam){
+    if(ferramenta !== 'mao') return;
+    const W = cam === 'A' ? telaWA : telaWB, H = cam === 'A' ? telaHA : telaHB;
+    const arr = cam === 'A' ? anotacoesA : anotacoesB;
+    const p = posicaoRelativa(e, canvasOrigem);
+    for(let i = arr.length - 1; i >= 0; i--){
+      const f = arr[i];
+      if(f.tipo === 'texto' && distanciaFormaPx(f, p, W, H) <= TOLERANCIA_SELECAO){
+        abrirEdicaoTexto(e.clientX, e.clientY, f.cor, f.texto, valor => {
+          if(valor) f.texto = valor;
+          else arr.splice(arr.indexOf(f), 1);
+        });
+        return;
+      }
+    }
+  }
+  telaA.addEventListener('dblclick', e => dblclickTextoDuo(e, telaA, 'A'));
+  telaB.addEventListener('dblclick', e => dblclickTextoDuo(e, telaB, 'B'));
+
+  // Apontador tipo laser por câmera: roda em paralelo ao desenho normal
+  telaA.addEventListener('pointermove', e => {
+    if(!apontadorAtivo || !videoA.src) return;
+    registrarPontoApontador(trilhaApontadorA, posicaoRelativa(e, telaA));
+  });
+  telaB.addEventListener('pointermove', e => {
+    if(!apontadorAtivo || !videoB.src) return;
+    registrarPontoApontador(trilhaApontadorB, posicaoRelativa(e, telaB));
+  });
+  telaA.addEventListener('pointerleave', () => { trilhaApontadorA = []; });
+  telaB.addEventListener('pointerleave', () => { trilhaApontadorB = []; });
+
+  function mostrarDicaDuo(t){ dicaDuo.textContent = t; dicaDuo.classList.add('visivel'); }
+  function esconderDicaDuo(){ dicaDuo.classList.remove('visivel'); }
+
+  // ---- Reprodução sincronizada (A = referência, B segue com defasagem) ----
+  function alternarPlayDuo(){
+    if(!videoA.src || !videoB.src) return;
+    const pausado = layoutDuo === 'B' ? videoB.paused : videoA.paused;
+    if(pausado){
+      if(layoutDuo === 'ambas'){
+        videoB.currentTime = Math.min(Math.max(videoA.currentTime + defasagem, 0), videoB.duration || 0);
+        videoA.play(); videoB.play();
+      } else if(layoutDuo === 'A'){
+        videoA.play(); // B fica parada (sem decodificar) enquanto não estiver visível
+      } else {
+        videoB.play(); // A fica parada (sem decodificar) enquanto não estiver visível
+      }
+    } else {
+      videoA.pause(); videoB.pause();
+    }
+  }
+  duoBtnPlay.addEventListener('click', alternarPlayDuo);
+  videoA.addEventListener('play', atualizarIconePlayDuo);
+  videoA.addEventListener('pause', atualizarIconePlayDuo);
+  videoB.addEventListener('play', atualizarIconePlayDuo);
+  videoB.addEventListener('pause', atualizarIconePlayDuo);
+  function atualizarIconePlayDuo(){
+    const tocando = layoutDuo === 'B' ? !videoB.paused : !videoA.paused;
+    duoIcoPlay.style.display = tocando ? 'none' : 'block';
+    duoIcoPause.style.display = tocando ? 'block' : 'none';
+  }
+
+  // Corrige o pequeno atraso natural entre dois elementos <video> tocando ao
+  // mesmo tempo: durante o play, reaproxima B do ponto esperado se ele desviar.
+  // Só roda no layout "lado a lado" — nos layouts de 1 câmera só, a escondida
+  // fica parada de propósito (economiza decodificar um vídeo que não aparece).
+  function sincronizarReproducaoDuo(){
+    if(!videoA.src || !videoB.src || layoutDuo !== 'ambas' || videoA.paused) return;
+    const alvo = Math.min(Math.max(videoA.currentTime + defasagem, 0), videoB.duration || 0);
+    if(Math.abs(videoB.currentTime - alvo) > 0.08) videoB.currentTime = alvo;
+  }
+
+  function passoQuadroDuo(dir){
+    if(!videoA.src || !videoB.src) return;
+    videoA.pause(); videoB.pause();
+    videoA.currentTime = Math.min(Math.max(videoA.currentTime + dir/FPS, 0), videoA.duration || 0);
+    videoB.currentTime = Math.min(Math.max(videoA.currentTime + defasagem, 0), videoB.duration || 0);
+  }
+  duoBtnQuadroTras.addEventListener('click', () => passoQuadroDuo(-1));
+  duoBtnQuadroFrente.addEventListener('click', () => passoQuadroDuo(1));
+
+  // Passo de quadro INDIVIDUAL (só uma câmera por vez, sem mexer na outra):
+  // serve para o coach navegar cada vídeo até o instante exato do golpe (ex:
+  // o toque da bola na raquete) antes de clicar em "Sincronizar aqui".
+  function passoQuadroIndividual(v, dir){
+    if(!v.src) return;
+    v.pause();
+    v.currentTime = Math.min(Math.max(v.currentTime + dir/FPS, 0), v.duration || 0);
+  }
+  document.querySelectorAll('[data-passo-cam]').forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.passoCam === 'A' ? videoA : videoB;
+    passoQuadroIndividual(v, parseInt(b.dataset.passoDir, 10));
+  }));
+
+  document.querySelectorAll('.btn-vel-duo').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.btn-vel-duo').forEach(x => x.classList.remove('ativo'));
+    b.classList.add('ativo');
+    const vel = parseFloat(b.dataset.vel);
+    videoA.playbackRate = vel; videoB.playbackRate = vel;
+  }));
+  document.querySelectorAll('.btn-fps-duo').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.btn-fps-duo').forEach(x => x.classList.remove('ativo'));
+    b.classList.add('ativo');
+    FPS = parseInt(b.dataset.fps, 10);
+  }));
+
+  // ---- Linha do tempo (câmera A é a referência) ----
+  function atualizarTempoDuo(){
+    duoTempoEl.textContent = fmt(videoA.currentTime) + ' / ' + fmt(videoA.duration);
+    if(videoA.duration){
+      const pct = (videoA.currentTime / videoA.duration) * 1000;
+      duoBarra.value = pct;
+      duoBarra.style.setProperty('--prog', (pct/10) + '%');
+    }
+    // Barras individuais: mostram e permitem ajustar cada câmera à parte,
+    // sem depender da defasagem — útil pra caçar o quadro exato do golpe
+    // em cada vídeo antes de clicar em "Sincronizar aqui".
+    duoTempoAEl.textContent = 'A · ' + fmt(videoA.currentTime) + ' / ' + fmt(videoA.duration);
+    if(videoA.duration){
+      const pctA = (videoA.currentTime / videoA.duration) * 1000;
+      duoBarraA.value = pctA;
+      duoBarraA.style.setProperty('--prog', (pctA/10) + '%');
+    }
+    duoTempoBEl.textContent = 'B · ' + fmt(videoB.currentTime) + ' / ' + fmt(videoB.duration);
+    if(videoB.duration){
+      const pctB = (videoB.currentTime / videoB.duration) * 1000;
+      duoBarraB.value = pctB;
+      duoBarraB.style.setProperty('--prog', (pctB/10) + '%');
+    }
+  }
+  duoBarra.addEventListener('input', () => {
+    if(!videoA.duration) return;
+    videoA.currentTime = (duoBarra.value/1000) * videoA.duration;
+    videoB.currentTime = Math.min(Math.max(videoA.currentTime + defasagem, 0), videoB.duration || 0);
+  });
+  // Barras individuais: mexem SÓ na câmera correspondente (não aplicam a
+  // defasagem nem tocam na outra câmera) — pausa as duas pra não conflitar
+  // com a correção automática de sincronismo durante o play.
+  duoBarraA.addEventListener('input', () => {
+    if(!videoA.duration) return;
+    videoA.pause(); videoB.pause();
+    videoA.currentTime = (duoBarraA.value/1000) * videoA.duration;
+  });
+  duoBarraB.addEventListener('input', () => {
+    if(!videoB.duration) return;
+    videoA.pause(); videoB.pause();
+    videoB.currentTime = (duoBarraB.value/1000) * videoB.duration;
+  });
+
+  // ---- Defasagem entre as câmeras ----
+  function atualizarDefasagemTexto(){
+    const sinal = defasagem > 0 ? '+' : '';
+    duoDefValor.textContent = sinal + defasagem.toFixed(2) + 's';
+  }
+  function ajustarDefasagem(delta){
+    defasagem = Math.round((defasagem + delta) * 100) / 100;
+    atualizarDefasagemTexto();
+    if(videoA.src && videoB.src){
+      videoB.currentTime = Math.min(Math.max(videoA.currentTime + defasagem, 0), videoB.duration || 0);
+    }
+  }
+  duoDefMenos.addEventListener('click', () => ajustarDefasagem(-0.1));
+  duoDefMais.addEventListener('click', () => ajustarDefasagem(0.1));
+  duoSincAgora.addEventListener('click', () => {
+    if(!videoA.src || !videoB.src){
+      mostrarDicaDuo('Carregue os dois vídeos antes de sincronizar');
+      setTimeout(esconderDicaDuo, 2200);
+      return;
+    }
+    defasagem = Math.round((videoB.currentTime - videoA.currentTime) * 100) / 100;
+    atualizarDefasagemTexto();
+    mostrarDicaDuo('Sincronizado! Defasagem definida em ' + duoDefValor.textContent + ' a partir deste instante');
+    setTimeout(esconderDicaDuo, 2800);
+  });
+
+  duoModoLimpoBtn.addEventListener('click', alternarModoLimpo);
+
+  // ---- Alternar entre modo 1 câmera e modo 2 câmeras ----
+  function alternarModo2Cam(){
+    if(emGravacao || preparandoRec){
+      mostrarDica('Pare a gravação antes de trocar de modo');
+      mostrarDicaDuo('Pare a gravação antes de trocar de modo');
+      setTimeout(() => { esconderDica(); esconderDicaDuo(); }, 2200);
+      return;
+    }
+    video.pause(); videoA.pause(); videoB.pause();
+    modoAtual = modoAtual === '1cam' ? '2cam' : '1cam';
+    const duo = modoAtual === '2cam';
+    envoltorio1Cam.style.display = duo ? 'none' : '';
+    duoEnvoltorio.style.display = duo ? '' : 'none';
+    btnModo2Cam.classList.toggle('ativo', duo);
+    txtModo2Cam.textContent = duo ? '1 câmera' : '2 câmeras';
+    btnModo2Cam.title = duo ? 'Voltar para a análise de 1 câmera' : 'Comparar duas câmeras do mesmo golpe lado a lado';
+    btnTrocarVideoHeader.style.display = duo ? 'none' : '';
+    atualizarRotuloSessao();
+    setTimeout(() => { ajustarTela(); ajustarTelaDuo(); }, 60);
+  }
+  btnModo2Cam.addEventListener('click', alternarModo2Cam);
+
+  // ---------- Atalhos ----------
+  document.addEventListener('keydown', e => {
+    if((e.target.tagName === 'INPUT' && e.target.type !== 'range') || e.target.tagName === 'TEXTAREA') return;
+    const k = e.key.toLowerCase();
+    if(e.code === 'Space'){ e.preventDefault(); modoAtual === '2cam' ? alternarPlayDuo() : alternarPlay(); }
+    else if(e.key === 'ArrowLeft'){ e.preventDefault(); modoAtual === '2cam' ? passoQuadroDuo(-1) : passoQuadro(-1); }
+    else if(e.key === 'ArrowRight'){ e.preventDefault(); modoAtual === '2cam' ? passoQuadroDuo(1) : passoQuadro(1); }
+    else if(k === 'f') alternarTelaCheia();
+    else if(k === 'h') alternarModoLimpo();
+    else if(k === 'x') limpar();
+    else if(k === 'r'){ e.preventDefault(); if(!e.repeat) btnGravar.click(); }
+    else if((e.ctrlKey || e.metaKey) && k === 'z'){ e.preventDefault(); desfazer(); }
+    else if(k === 'v') selecionarFer('mao');
+    else if(k === 'c') selecionarFer('caneta');
+    else if(k === 'l') selecionarFer('linha');
+    else if(k === 's') selecionarFer('seta');
+    else if(k === 'o') selecionarFer('circulo');
+    else if(k === 'a') selecionarFer('angulo');
+    else if(k === 'b') selecionarFer('rastro');
+    else if(k === 'z') selecionarFer('zoom');
+    else if(k === 't') selecionarFer('texto');
+    else if(k === 'p') alternarApontador();
+    else if((e.key === 'Delete' || e.key === 'Backspace') && ferramenta === 'mao'){
+      e.preventDefault();
+      if(modoAtual === '2cam'){
+        if(formaSelecionadaDuo){
+          const arr = camSelecionadaDuo === 'A' ? anotacoesA : anotacoesB;
+          const idx = arr.indexOf(formaSelecionadaDuo);
+          if(idx >= 0) arr.splice(idx, 1);
+          formaSelecionadaDuo = null; camSelecionadaDuo = null;
+        }
+      } else if(formaSelecionada){
+        const idx = anotacoes.indexOf(formaSelecionada);
+        if(idx >= 0) anotacoes.splice(idx, 1);
+        formaSelecionada = null;
+      }
+    }
+    else if(e.key === 'Escape'){ zerarZoom(); zerarZoomDuo(); }
+  });
+  function selecionarFer(nome){
+    const b = document.querySelector(`[data-fer="${nome}"]`);
+    if(b) b.click();
+  }
+})();
+</script>
+</body>
+</html>
