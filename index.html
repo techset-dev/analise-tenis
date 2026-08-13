@@ -168,6 +168,13 @@
   .aviso-download.visivel{display:block}
   .aviso-download a{color:var(--bola)}
 
+  /* Flash de captura de print, tipo obturador de câmera */
+  .flash-print{
+    position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:30;
+  }
+  .flash-print.disparar{opacity:.85;transition:opacity .06s ease-out}
+  .flash-print.apagando{opacity:0;transition:opacity .35s ease-out}
+
   .caixa-texto-edicao{
     position:fixed;z-index:60;min-width:160px;max-width:360px;min-height:36px;
     padding:7px 9px;border-radius:8px;border:2px solid var(--bola);
@@ -243,9 +250,13 @@
       <svg viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2.5"/><path d="M16 9.5l6-3.5v12l-6-3.5z"/></svg>
       <span id="txtWebcam">Webcam</span>
     </button>
-    <button class="btn" id="btnPasta" title="Escolher a pasta onde as gravações serão salvas">
+    <button class="btn" id="btnPasta" title="Escolher a pasta onde as gravações e os prints serão salvos">
       <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
       <span id="txtPasta">Pasta de destino</span>
+    </button>
+    <button class="btn" id="btnPrint" title="Capturar print da tela com as anotações e salvar direto na pasta de destino (I)">
+      <svg viewBox="0 0 24 24"><path d="M9 3h6l1.5 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2.5L9 3z"/><circle cx="12" cy="13" r="3.6"/></svg>
+      <span id="txtPrint">Print</span>
     </button>
     <button class="btn" id="btnGravar" title="Gravar análise com narração (R)">
       <span class="ponto"></span><span id="txtGravar">Gravar análise</span>
@@ -334,6 +345,7 @@
       </div>
       <div class="zoom-chip" id="zoomChip">Zoom 2×</div>
       <div class="dica-flutuante" id="dica"></div>
+      <div class="flash-print" id="flashPrint"></div>
       <video id="webcamPreview1" class="webcam-pip" autoplay muted playsinline style="display:none"></video>
 
       <div class="envio" id="areaEnvio">
@@ -466,6 +478,7 @@
       </div>
       </div>
       <div class="dica-flutuante" id="dicaDuo"></div>
+      <div class="flash-print" id="flashPrintDuo"></div>
       <video id="webcamPreview2" class="webcam-pip" autoplay muted playsinline style="display:none"></video>
     </div>
 
@@ -1198,12 +1211,12 @@
     tela.classList.toggle('modo-mao', ferramenta === 'mao');
     telaA.classList.toggle('modo-mao', ferramenta === 'mao');
     telaB.classList.toggle('modo-mao', ferramenta === 'mao');
-    if(ferramenta === 'angulo') mostrarDicaAtual('Ângulo: clique em 3 pontos — extremidade, vértice (articulação), extremidade');
-    else if(ferramenta === 'rastro') mostrarDicaAtual('Rastro: pause perto do início do golpe e clique na bola. A cada clique avanço 1 quadro sozinho.');
-    else if(ferramenta === 'zoom') mostrarDicaAtual('Zoom: clique onde quer aproximar (2×, 3×, 4×). Esc volta ao normal.');
-    else if(ferramenta === 'texto') mostrarDicaAtual('Texto: clique onde quer escrever (clicar num texto já existente edita ele). Clique fora ou saia do campo pra confirmar; Esc cancela.');
-    else if(ferramenta === 'mao') mostrarDicaAtual('Mover: clique numa marcação pra selecionar. Arraste o corpo pra mover, ou as alças brancas pra ajustar. Delete apaga a selecionada.');
-    else esconderDicaAtual();
+    if(ferramenta === 'angulo') mostrarDicaFerramenta('Ângulo: clique em 3 pontos — extremidade, vértice (articulação), extremidade');
+    else if(ferramenta === 'rastro') mostrarDicaFerramenta('Rastro: pause perto do início do golpe e clique na bola. A cada clique avanço 1 quadro sozinho.');
+    else if(ferramenta === 'zoom') mostrarDicaFerramenta('Zoom: clique onde quer aproximar (2×, 3×, 4×). Esc volta ao normal.');
+    else if(ferramenta === 'texto') mostrarDicaFerramenta('Texto: clique onde quer escrever (clicar num texto já existente edita ele). Clique fora ou saia do campo pra confirmar; Esc cancela.');
+    else if(ferramenta === 'mao') mostrarDicaFerramenta('Mover: clique numa marcação pra selecionar. Arraste o corpo pra mover, ou as alças brancas pra ajustar. Delete apaga a selecionada.');
+    else { clearTimeout(timerDicaFerramenta); esconderDicaAtual(); }
   }));
   document.querySelectorAll('.cor').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('.cor').forEach(x => x.classList.remove('ativa'));
@@ -1252,6 +1265,19 @@
   function esconderDica(){ dica.classList.remove('visivel'); }
   function mostrarDicaAtual(t){ modoAtual === '2cam' ? mostrarDicaDuo(t) : mostrarDica(t); }
   function esconderDicaAtual(){ modoAtual === '2cam' ? esconderDicaDuo() : esconderDica(); }
+
+  // As dicas de ferramenta (explicando "Ângulo", "Mover" etc ao escolher a
+  // ferramenta) ficavam presas na tela pra sempre, porque só eram escondidas
+  // ao trocar de ferramenta de novo. Agora elas se escondem sozinhas depois
+  // de um tempo, como as outras dicas rápidas do app — sem precisar clicar
+  // em nada. Troca de ferramenta rápida cancela o timer anterior, pra dica
+  // nova não ser cortada por um timer que já estava rodando.
+  let timerDicaFerramenta = null;
+  function mostrarDicaFerramenta(t){
+    mostrarDicaAtual(t);
+    clearTimeout(timerDicaFerramenta);
+    timerDicaFerramenta = setTimeout(esconderDicaAtual, 6000);
+  }
 
   // ---------- Reprodução ----------
   function alternarPlay(){
@@ -1372,6 +1398,163 @@
     else if(modoAtual === '2cam') iniciarGravacaoDuo();
     else iniciarGravacao();
   });
+
+  // ================================================================
+  // PRINT DA TELA (foto do quadro atual, com todas as anotações)
+  // Ideia: o coach faz as marcações com calma, com o vídeo parado, e quando
+  // estiver satisfeito aperta "Print" — captura exatamente o que está vendo
+  // (vídeo + anotações + webcam, sem os painéis) numa imagem PNG e já salva
+  // direto na pasta de destino escolhida em "Pasta de destino" (o mesmo
+  // showDirectoryPicker usado pelas gravações). Sem pasta escolhida, cai no
+  // "Salvar como" e, sem suporte a nada disso, faz o download comum.
+  // ================================================================
+  const btnPrint = document.getElementById('btnPrint');
+  const flashPrint = document.getElementById('flashPrint');
+  const flashPrintDuo = document.getElementById('flashPrintDuo');
+  let preparandoPrint = false;
+  let contadorPrint = 0;
+
+  function nomeArquivoPrint(){
+    const base = (nomeArquivo.textContent || 'video').replace(/\.[^.]+$/,'').replace(/[^\w\-]+/g,'-').slice(0,40);
+    const data = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    contadorPrint++;
+    return 'print-' + base + '-' + data + '-' + String(contadorPrint).padStart(2,'0') + '.png';
+  }
+
+  // Desenha um quadro (vídeo + anotações + webcam) num canvas novo, na
+  // resolução nativa do vídeo — mesma lógica usada na gravação, mas só um
+  // quadro. mostrarSelecao fica sempre false: alças de seleção são só para
+  // uso ao vivo, nunca devem aparecer numa imagem salva.
+  function capturarQuadroAtual(){
+    const W = video.videoWidth || 1280, H = video.videoHeight || 720;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const cx = c.getContext('2d');
+    const escala = W / telaW;
+    if(zoom.z > 1){
+      const sw = W/zoom.z, sh = H/zoom.z;
+      const sx = zoom.lx*W, sy = zoom.ly*H;
+      cx.setTransform(1,0,0,1,0,0);
+      cx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
+      cx.setTransform(zoom.z, 0, 0, zoom.z, -sx*zoom.z, -sy*zoom.z);
+      desenharTudo(cx, W, H, escala, video.currentTime || 0, false);
+      cx.setTransform(1,0,0,1,0,0);
+    } else {
+      cx.drawImage(video, 0, 0, W, H);
+      desenharTudo(cx, W, H, escala, video.currentTime || 0, false);
+    }
+    desenharWebcamPip(cx, W, H);
+    return c;
+  }
+
+  // Equivalente no modo 2 câmeras: monta o mesmo layout (lado a lado, ou só
+  // A/só B) usado na gravação em dupla, pra o print sair igual ao que o
+  // coach está vendo na tela naquele instante.
+  function capturarQuadroAtualDuo(){
+    const WA = videoA.videoWidth || 1280, HA = videoA.videoHeight || 720;
+    const WB = videoB.videoWidth || 1280, HB = videoB.videoHeight || 720;
+    let W, H;
+    if(layoutDuo === 'A'){ W = WA; H = HA; }
+    else if(layoutDuo === 'B'){ W = WB; H = HB; }
+    else { W = WA + WB; H = Math.max(HA, HB); }
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const cx = c.getContext('2d');
+    const escalaA = WA / telaWA, escalaB = WB / telaWB;
+    cx.fillStyle = '#000'; cx.fillRect(0,0,W,H);
+
+    function desenharCam(cam, xOffset, Wc, Hc, escalaC){
+      const v = cam === 'A' ? videoA : videoB;
+      const t = (cam === 'A' ? videoA.currentTime : videoB.currentTime) || 0;
+      if(zoomDuo.z > 1){
+        const sw = Wc/zoomDuo.z, sh = Hc/zoomDuo.z;
+        const sx = zoomDuo.lx*Wc, sy = zoomDuo.ly*Hc;
+        cx.setTransform(1,0,0,1,xOffset,0);
+        cx.drawImage(v, sx, sy, sw, sh, 0, 0, Wc, Hc);
+        cx.setTransform(zoomDuo.z, 0, 0, zoomDuo.z, xOffset - sx*zoomDuo.z, -sy*zoomDuo.z);
+        desenharTudoDuo(cx, Wc, Hc, escalaC, t, cam, false);
+      } else {
+        cx.setTransform(1,0,0,1,xOffset,0);
+        cx.drawImage(v, 0, 0, Wc, Hc);
+        desenharTudoDuo(cx, Wc, Hc, escalaC, t, cam, false);
+      }
+      cx.setTransform(1,0,0,1,0,0);
+    }
+
+    if(layoutDuo === 'A') desenharCam('A', 0, WA, HA, escalaA);
+    else if(layoutDuo === 'B') desenharCam('B', 0, WB, HB, escalaB);
+    else { desenharCam('A', 0, WA, HA, escalaA); desenharCam('B', WA, WB, HB, escalaB); }
+
+    desenharWebcamPip(cx, W, H);
+    return c;
+  }
+
+  // Efeito visual rápido (tipo obturador de câmera) pra confirmar que o
+  // print foi tirado, mesmo antes do aviso de "salvo em..." aparecer.
+  function dispararFlash(el){
+    if(!el) return;
+    el.classList.remove('apagando');
+    el.classList.add('disparar');
+    requestAnimationFrame(() => {
+      el.classList.remove('disparar');
+      el.classList.add('apagando');
+    });
+  }
+
+  async function salvarImagem(blob, nome){
+    // Caminho 1: pasta de destino já escolhida -> grava direto nela, sem
+    // nenhum diálogo, exatamente como o coach pediu.
+    if(pastaHandle){
+      try{
+        const fh = await pastaHandle.getFileHandle(nome, {create:true});
+        const w = await fh.createWritable();
+        await w.write(blob); await w.close();
+        avisar('Print salvo em <b>' + pastaHandle.name + '/' + nome + '</b>');
+        return;
+      }catch(e){ /* permissão perdida? cai para os próximos caminhos */ }
+    }
+    // Caminho 2: sem pasta definida, mas o navegador sabe abrir "Salvar como"
+    if(suportaSalvarComo){
+      try{
+        const fh = await window.showSaveFilePicker({
+          suggestedName: nome,
+          types:[{ description:'Print da análise', accept:{'image/png':['.png']} }]
+        });
+        const w = await fh.createWritable();
+        await w.write(blob); await w.close();
+        avisar('Print salvo como <b>' + fh.name + '</b> no local escolhido');
+        return;
+      }catch(e){ /* cancelou o diálogo: cai no download comum */ }
+    }
+    // Caminho 3: download comum na pasta Downloads
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = nome;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    avisar('Print salvo como <b>' + nome + '</b> na pasta Downloads' + (pastaHandle ? '' : '.<br>Dica: use "Pasta de destino" para os próximos prints salvarem automaticamente.'));
+  }
+
+  async function capturarPrint(){
+    if(preparandoPrint) return;
+    const duo = modoAtual === '2cam';
+    if(duo){
+      if(!videoA.src || !videoB.src){ mostrarDicaDuo('Carregue os dois vídeos antes de tirar o print'); setTimeout(esconderDicaDuo,2500); return; }
+    } else if(!video.src){
+      mostrarDica('Carregue um vídeo antes de tirar o print'); setTimeout(esconderDica,2500); return;
+    }
+    preparandoPrint = true;
+    dispararFlash(duo ? flashPrintDuo : flashPrint);
+    try{
+      const canvas = duo ? capturarQuadroAtualDuo() : capturarQuadroAtual();
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if(!blob){ avisar('Não consegui gerar a imagem do print. Tente de novo.'); return; }
+      await salvarImagem(blob, nomeArquivoPrint());
+    } finally {
+      preparandoPrint = false;
+    }
+  }
+  btnPrint.addEventListener('click', capturarPrint);
 
   async function iniciarGravacao(){
     if(!video.src){ mostrarDica('Carregue um vídeo antes de gravar'); setTimeout(esconderDica,2500); return; }
@@ -1880,7 +2063,9 @@
     }
     atualizarRotuloSessao();
     envio.style.display = 'none';
+    avisoCargaDuoMostrado = false; // vídeo novo: reavalia se a combinação ficou pesada
     v.addEventListener('loadedmetadata', ajustarTelaDuo, {once:true});
+    v.addEventListener('loadedmetadata', verificarCargaDuo, {once:true});
   }
   document.querySelector('[data-cam-btn="A"]').addEventListener('click', () => inputA.click());
   document.querySelector('[data-cam-btn="B"]').addEventListener('click', () => inputB.click());
@@ -2152,6 +2337,26 @@
   function mostrarDicaDuo(t){ dicaDuo.textContent = t; dicaDuo.classList.add('visivel'); }
   function esconderDicaDuo(){ dicaDuo.classList.remove('visivel'); }
 
+  // Aviso amigável sobre travamento em vídeos muito pesados (ex: 4K a 60/120fps).
+  // Decodificar DUAS câmeras assim ao mesmo tempo pode passar da capacidade de
+  // decodificação de vídeo da maioria dos notebooks — isso não é um bug do app,
+  // é limite de hardware mesmo (o navegador precisa decodificar os dois vídeos
+  // em paralelo, e poucos computadores conseguem fazer isso em tempo real com
+  // duas fontes em 4K/alto fps). Resolução mais alta ajuda pra ver detalhe, mas
+  // pra revisão lado a lado 1080p já é nítido de sobra e evita o travamento.
+  const LIMITE_PIXELS_CAM_DUO = 1920 * 1080 * 1.6; // acima disso, já vale o aviso
+  let avisoCargaDuoMostrado = false;
+  function verificarCargaDuo(){
+    if(!videoA.videoWidth || !videoB.videoWidth || avisoCargaDuoMostrado) return;
+    const pxA = videoA.videoWidth * videoA.videoHeight;
+    const pxB = videoB.videoWidth * videoB.videoHeight;
+    if(pxA > LIMITE_PIXELS_CAM_DUO || pxB > LIMITE_PIXELS_CAM_DUO){
+      avisoCargaDuoMostrado = true;
+      mostrarDicaDuo('Vídeos em resolução muito alta (ex: 4K/alto fps) podem travar ao tocar as duas câmeras juntas — isso é limite do computador, não do app. Se travar muito, exporte cópias em 1080p pra essa comparação lado a lado.');
+      setTimeout(esconderDicaDuo, 8000);
+    }
+  }
+
   // ---- Reprodução sincronizada (A = referência, B segue com defasagem) ----
   function alternarPlayDuo(){
     if(!videoA.src || !videoB.src) return;
@@ -2184,10 +2389,77 @@
   // mesmo tempo: durante o play, reaproxima B do ponto esperado se ele desviar.
   // Só roda no layout "lado a lado" — nos layouts de 1 câmera só, a escondida
   // fica parada de propósito (economiza decodificar um vídeo que não aparece).
+  //
+  // Corrigir o desvio "teleportando" (videoB.currentTime = alvo) a cada
+  // quadro em que o desvio passasse de 80ms era a causa do travamento forte
+  // ao reproduzir as duas câmeras: cada ajuste desses é um SEEK, que obriga
+  // o navegador a re-decodificar a partir do keyframe mais próximo e trava
+  // a imagem por um instante — e como dois vídeos decodificando ao mesmo
+  // tempo naturalmente desviam com frequência, isso virava uma sequência de
+  // pequenos travamentos, quase contínua.
+  // Agora: desvios pequenos (o caso comum) são corrigidos deixando a Câmera
+  // B rodar um pouco mais rápida/lenta por um instante (playbackRate), sem
+  // nenhum salto visível. Só um desvio grande (ex: um engasgo real) usa o
+  // seek de verdade — e no máximo poucas vezes por minuto, pra nunca formar
+  // uma sequência de travamentos.
+  //
+  // Um segundo bug (esse sim era o principal causador do travamento que
+  // continuava mesmo em 1080p, sem CPU/GPU no limite): o limiar pra ENTRAR
+  // na correção de velocidade e pra SAIR dela era o mesmo (0.08s). Isso faz
+  // o desvio ficar oscilando bem em cima da linha — entra, corrige um
+  // pouquinho, sai, o desvio volta a crescer, entra de novo... e cada uma
+  // dessas trocas de playbackRate (medimos ~300 em 9s de reprodução, ou
+  // seja, quase uma a cada quadro!) faz o player de vídeo reajustar o timing
+  // internamente, o que por si só já é percebido como travamento, mesmo sem
+  // pesar CPU/GPU. A correção: histerese — só ENTRA na correção acima de
+  // LIMITE_DESVIO_LEVE, mas só SAI quando o desvio já ficou bem menor
+  // (LIMITE_SAIR_CORRECAO), e o ajuste só é reavaliado a cada
+  // INTERVALO_MIN_AJUSTE_RATE ms (em vez de todo quadro).
+  const LIMITE_DESVIO_LEVE = 0.08;      // a partir daqui, entra na correção de velocidade
+  const LIMITE_SAIR_CORRECAO = 0.025;   // só sai da correção quando o desvio já ficou bem pequeno
+  const LIMITE_DESVIO_GRAVE = 0.6;      // a partir daqui (desvio grande de verdade), força um salto (seek)
+  const INTERVALO_MIN_SEEK_DUO = 4000;      // ms mínimos entre dois seeks de correção
+  const INTERVALO_MIN_AJUSTE_RATE = 200;    // ms mínimos entre reavaliações da velocidade de B
+  let ultimoSeekCorrecaoDuo = 0;
+  let ultimoAjusteRateDuo = 0;
+  let corrigindoVelocidadeB = false;
   function sincronizarReproducaoDuo(){
-    if(!videoA.src || !videoB.src || layoutDuo !== 'ambas' || videoA.paused) return;
+    if(!videoA.src || !videoB.src || layoutDuo !== 'ambas' || videoA.paused){
+      corrigindoVelocidadeB = false;
+      if(videoB.playbackRate !== (videoA.playbackRate || 1)) videoB.playbackRate = videoA.playbackRate || 1;
+      return;
+    }
+    const velBase = videoA.playbackRate || 1;
     const alvo = Math.min(Math.max(videoA.currentTime + defasagem, 0), videoB.duration || 0);
-    if(Math.abs(videoB.currentTime - alvo) > 0.08) videoB.currentTime = alvo;
+    const desvio = videoB.currentTime - alvo; // positivo = B está adiantada
+    const absDesvio = Math.abs(desvio);
+    const agora = performance.now();
+
+    if(absDesvio > LIMITE_DESVIO_GRAVE){
+      // Desvio grande de verdade (ex: engasgou decodificando) — vale um seek,
+      // mas raramente, pra nunca virar uma sequência de travamentos.
+      if(agora - ultimoSeekCorrecaoDuo > INTERVALO_MIN_SEEK_DUO){
+        videoB.currentTime = alvo;
+        videoB.playbackRate = velBase;
+        ultimoSeekCorrecaoDuo = agora;
+        corrigindoVelocidadeB = false;
+      }
+      return;
+    }
+
+    if(agora - ultimoAjusteRateDuo < INTERVALO_MIN_AJUSTE_RATE) return; // não reavalia todo quadro
+
+    if(!corrigindoVelocidadeB && absDesvio > LIMITE_DESVIO_LEVE){
+      corrigindoVelocidadeB = true;
+    } else if(corrigindoVelocidadeB && absDesvio < LIMITE_SAIR_CORRECAO){
+      corrigindoVelocidadeB = false;
+    }
+
+    const novaTaxa = corrigindoVelocidadeB ? (desvio > 0 ? velBase * 0.92 : velBase * 1.08) : velBase;
+    if(videoB.playbackRate !== novaTaxa){
+      videoB.playbackRate = novaTaxa;
+      ultimoAjusteRateDuo = agora;
+    }
   }
 
   function passoQuadroDuo(dir){
@@ -2328,6 +2600,7 @@
     else if(k === 'h') alternarModoLimpo();
     else if(k === 'x') limpar();
     else if(k === 'r'){ e.preventDefault(); if(!e.repeat) btnGravar.click(); }
+    else if(k === 'i'){ e.preventDefault(); if(!e.repeat) btnPrint.click(); }
     else if((e.ctrlKey || e.metaKey) && k === 'z'){ e.preventDefault(); desfazer(); }
     else if(k === 'v') selecionarFer('mao');
     else if(k === 'c') selecionarFer('caneta');
