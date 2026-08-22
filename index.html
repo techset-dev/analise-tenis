@@ -74,7 +74,7 @@
     padding:5px 12px;border-radius:999px;font-size:.78rem;font-weight:600;display:none;
   }
   .zoom-chip.visivel{display:block}
-  video{max-width:100%;max-height:100%;display:block}
+  video,img{max-width:100%;max-height:100%;display:block}
   .tela-anot{position:absolute;cursor:crosshair;touch-action:none}
   .tela-anot.modo-mao{cursor:default}
 
@@ -221,10 +221,41 @@
   .duo-cam .envio h2{font-size:1.1rem}
   .duo-cam .envio p{font-size:.76rem}
   #grupoDefasagem .tempo{font-size:.85rem;min-width:64px;text-align:center}
+
+  /* Câmera carregada por link (YouTube/Instagram): o iframe ocupa o espaço
+     inteiro da câmera, no lugar do <video>+<canvas> (ver .zoom-wrap acima),
+     que ficam ocultos enquanto o link estiver ativo. */
+  .link-embed{position:absolute;inset:0;width:100%;height:100%;border:0;z-index:4;background:#000}
+  .envio-link{
+    margin-top:2px;padding-top:12px;border-top:1px dashed var(--linha);
+    display:flex;flex-direction:column;gap:8px;align-items:center;width:100%;max-width:280px;
+  }
+  .envio-link span{font-size:.72rem;color:var(--giz-2)}
+  .envio-link-linha{display:flex;gap:6px;width:100%}
+  .campo-link{
+    flex:1;min-width:0;background:var(--quadra);border:1px solid var(--linha);color:var(--giz);
+    border-radius:var(--raio);padding:7px 10px;font-size:.78rem;font-family:inherit;
+  }
+  .campo-link::placeholder{color:var(--giz-2)}
+  .campo-link:focus-visible{outline:2px solid var(--bola);outline-offset:1px}
+  .envio-link .btn{padding:7px 10px;font-size:.76rem}
   @media (max-width:900px){
     .duo-palco{flex-direction:column}
     .duo-coluna + .duo-coluna{border-left:none;border-top:1px solid var(--linha)}
   }
+
+  /* Modo Fotos: reaproveita o mesmo layout visual do modo 2 câmeras
+     (.duo-palco/.duo-coluna/.duo-cam), só trocando vídeo por imagem. */
+  .foto-cam-remover{right:46px} /* fica ao lado do botão "adicionar", que usa right:8px */
+  .foto-contador{
+    min-width:64px;height:26px;padding:0 6px;border-radius:6px;
+    background:rgba(13,27,42,.85);color:var(--giz);
+    display:flex;align-items:center;justify-content:center;
+    font-size:.72rem;font-weight:600;font-variant-numeric:tabular-nums;
+  }
+  /* Rastro acompanha o tempo do vídeo quadro a quadro — não existe "tempo"
+     numa foto parada, então a ferramenta fica visivelmente desativada. */
+  .foto-modo .btn-fer[data-fer="rastro"]{opacity:.35;pointer-events:none;cursor:not-allowed}
 
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
   @media (max-width:760px){
@@ -242,9 +273,17 @@
   <div class="sessao" id="nomeArquivo">Nenhum vídeo carregado</div>
   <div class="direita">
     <span class="tempo-rec" id="tempoRec"></span>
+    <button class="btn ativo" id="btnModo1Cam" title="Analisar um vídeo por vez">
+      <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1.5"/></svg>
+      <span>1 câmera</span>
+    </button>
     <button class="btn" id="btnModo2Cam" title="Comparar duas câmeras do mesmo golpe lado a lado">
       <svg viewBox="0 0 24 24"><rect x="2" y="5" width="9" height="14" rx="1.5"/><rect x="13" y="5" width="9" height="14" rx="1.5"/></svg>
-      <span id="txtModo2Cam">2 câmeras</span>
+      <span>2 câmeras</span>
+    </button>
+    <button class="btn" id="btnModoFoto" title="Analisar fotos paradas (aluno x referência)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5.5-5.5L7 19"/></svg>
+      <span>Fotos</span>
     </button>
     <button class="btn" id="btnWebcam" title="Mostrar sua webcam sobreposta ao vídeo (aparece também na gravação)">
       <svg viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2.5"/><path d="M16 9.5l6-3.5v12l-6-3.5z"/></svg>
@@ -425,8 +464,9 @@
           <video id="videoA" playsinline crossorigin="anonymous"></video>
           <canvas id="telaA" class="tela-anot modo-mao"></canvas>
         </div>
+        <iframe id="linkFrameA" class="link-embed" style="display:none" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="Vídeo carregado por link — Câmera A"></iframe>
         <div class="zoom-chip" id="zoomChipA">Zoom 2×</div>
-        <div class="duo-cam-passo">
+        <div class="duo-cam-passo" id="passoA">
           <button data-passo-cam="A" data-passo-dir="-1" title="Um quadro atrás — só a Câmera A (use para achar o instante exato do golpe antes de sincronizar)">
             <svg viewBox="0 0 24 24"><path d="M19 20L9 12l10-8v16zM5 19V5"/></svg> A
           </button>
@@ -439,9 +479,16 @@
           <p>1º ângulo do mesmo golpe (ex: lateral)</p>
           <button class="btn-primario" data-cam-btn="A">Escolher vídeo</button>
           <input type="file" accept="video/*" hidden data-cam-input="A">
+          <div class="envio-link">
+            <span>ou cole um link do YouTube/Instagram:</span>
+            <div class="envio-link-linha">
+              <input type="url" class="campo-link" placeholder="https://..." data-link-input="A" aria-label="Link do YouTube ou Instagram para a Câmera A">
+              <button class="btn" data-link-btn="A">Carregar link</button>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="duo-tempo-individual">
+      <div class="duo-tempo-individual" id="tempoIndivA">
         <span class="tempo tempo-mini" id="duoTempoA">A · 00:00.00 / 00:00.00</span>
         <input type="range" id="duoBarraA" min="0" max="1000" value="0" step="1" aria-label="Linha do tempo independente da Câmera A">
       </div>
@@ -456,8 +503,9 @@
           <video id="videoB" playsinline crossorigin="anonymous"></video>
           <canvas id="telaB" class="tela-anot modo-mao"></canvas>
         </div>
+        <iframe id="linkFrameB" class="link-embed" style="display:none" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="Vídeo carregado por link — Câmera B"></iframe>
         <div class="zoom-chip" id="zoomChipB">Zoom 2×</div>
-        <div class="duo-cam-passo">
+        <div class="duo-cam-passo" id="passoB">
           <button data-passo-cam="B" data-passo-dir="-1" title="Um quadro atrás — só a Câmera B (use para achar o instante exato do golpe antes de sincronizar)">
             <svg viewBox="0 0 24 24"><path d="M19 20L9 12l10-8v16zM5 19V5"/></svg> B
           </button>
@@ -470,9 +518,16 @@
           <p>2º ângulo do mesmo golpe (ex: de frente/trás)</p>
           <button class="btn-primario" data-cam-btn="B">Escolher vídeo</button>
           <input type="file" accept="video/*" hidden data-cam-input="B">
+          <div class="envio-link">
+            <span>ou cole um link do YouTube/Instagram:</span>
+            <div class="envio-link-linha">
+              <input type="url" class="campo-link" placeholder="https://..." data-link-input="B" aria-label="Link do YouTube ou Instagram para a Câmera B">
+              <button class="btn" data-link-btn="B">Carregar link</button>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="duo-tempo-individual">
+      <div class="duo-tempo-individual" id="tempoIndivB">
         <span class="tempo tempo-mini" id="duoTempoB">B · 00:00.00 / 00:00.00</span>
         <input type="range" id="duoBarraB" min="0" max="1000" value="0" step="1" aria-label="Linha do tempo independente da Câmera B">
       </div>
@@ -558,6 +613,96 @@
       </div>
     </div>
   </section>
+
+  <section class="palco-envoltorio foto-envoltorio" id="fotoEnvoltorio" style="display:none">
+    <div class="duo-palco" id="fotoPalco">
+      <div class="duo-coluna" id="fotoColunaA">
+      <div class="duo-cam" data-foto-lado="A" id="fotoPainelA">
+        <div class="duo-cam-rotulo">Aluno</div>
+        <button class="duo-cam-trocar" data-foto-add="A" title="Adicionar fotos ao álbum do aluno">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <button class="duo-cam-trocar foto-cam-remover" data-foto-remover="A" title="Remover esta foto do álbum" style="display:none">
+          <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
+        </button>
+        <div class="zoom-wrap" id="zoomWrapFotoA">
+          <img id="fotoImgA" alt="Foto do aluno" style="display:none">
+          <canvas id="telaFotoA" class="tela-anot modo-mao"></canvas>
+        </div>
+        <div class="zoom-chip" id="zoomChipFotoA">Zoom 2×</div>
+        <div class="duo-cam-passo">
+          <button data-foto-passo="A" data-foto-dir="-1" title="Foto anterior do aluno">
+            <svg viewBox="0 0 24 24"><path d="M19 20L9 12l10-8v16zM5 19V5"/></svg>
+          </button>
+          <span class="foto-contador" id="fotoContadorA">Foto 0/0</span>
+          <button data-foto-passo="A" data-foto-dir="1" title="Próxima foto do aluno">
+            <svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8V4zM19 5v14"/></svg>
+          </button>
+        </div>
+        <div class="envio" id="areaEnvioFotoA">
+          <h2>Solte as fotos do aluno aqui</h2>
+          <p>Uma ou várias imagens do golpe (JPG, PNG…). Dá pra ir adicionando mais depois.</p>
+          <button class="btn-primario" data-foto-btn="A">Escolher fotos</button>
+          <input type="file" accept="image/*" multiple hidden data-foto-input="A">
+        </div>
+      </div>
+      </div>
+      <div class="duo-coluna" id="fotoColunaB">
+      <div class="duo-cam" data-foto-lado="B" id="fotoPainelB">
+        <div class="duo-cam-rotulo">Referência</div>
+        <button class="duo-cam-trocar" data-foto-add="B" title="Adicionar fotos de referência (ex: print de um profissional)">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <button class="duo-cam-trocar foto-cam-remover" data-foto-remover="B" title="Remover esta foto do álbum" style="display:none">
+          <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
+        </button>
+        <div class="zoom-wrap" id="zoomWrapFotoB">
+          <img id="fotoImgB" alt="Foto de referência" style="display:none">
+          <canvas id="telaFotoB" class="tela-anot modo-mao"></canvas>
+        </div>
+        <div class="zoom-chip" id="zoomChipFotoB">Zoom 2×</div>
+        <div class="duo-cam-passo">
+          <button data-foto-passo="B" data-foto-dir="-1" title="Foto anterior da referência">
+            <svg viewBox="0 0 24 24"><path d="M19 20L9 12l10-8v16zM5 19V5"/></svg>
+          </button>
+          <span class="foto-contador" id="fotoContadorB">Foto 0/0</span>
+          <button data-foto-passo="B" data-foto-dir="1" title="Próxima foto da referência">
+            <svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8V4zM19 5v14"/></svg>
+          </button>
+        </div>
+        <div class="envio" id="areaEnvioFotoB">
+          <h2>Solte fotos de referência aqui</h2>
+          <p>Ex: print da técnica de um jogador profissional, pra comparar lado a lado com o aluno</p>
+          <button class="btn-primario" data-foto-btn="B">Escolher fotos</button>
+          <input type="file" accept="image/*" multiple hidden data-foto-input="B">
+        </div>
+      </div>
+      </div>
+      <div class="dica-flutuante" id="dicaFoto"></div>
+      <div class="flash-print" id="flashPrintFoto"></div>
+    </div>
+
+    <div class="controles" id="fotoControles">
+      <div class="linha-botoes">
+        <div class="grupo-velocidade" id="fotoVerGrupo" role="group" aria-label="Visualização dos painéis">
+          <span class="rotulo-vel">Ver</span>
+          <button class="btn ativo" data-ver-foto="ambas" title="Mostrar os dois painéis lado a lado">Lado a lado</button>
+          <button class="btn" data-ver-foto="A" title="Mostrar só o painel do Aluno em tela cheia">Aluno</button>
+          <button class="btn" data-ver-foto="B" title="Mostrar só o painel de Referência em tela cheia">Referência</button>
+        </div>
+
+        <div class="separador"></div>
+
+        <button class="btn" id="fotoModoLimpo" title="Ocultar painéis para captura de print (H)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg>
+          Modo limpo
+        </button>
+        <div class="atalhos">
+          <kbd>←</kbd><kbd>→</kbd> foto anterior/próxima (painel sob o mouse) · <kbd>Z</kbd> zoom · <kbd>P</kbd> laser · <kbd>I</kbd> print
+        </div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <div class="aviso-download" id="avisoDownload"></div>
@@ -618,14 +763,15 @@
   let arrastarInicioDuo = null;
   let formaInicioSnapshotDuo = null;
 
-  // Modo atual da ferramenta: '1cam' (padrão, tela original) ou '2cam' (duas câmeras lado a lado)
+  // Modo atual da ferramenta: '1cam' (padrão, tela original), '2cam' (duas
+  // câmeras lado a lado) ou 'foto' (álbum de fotos paradas, aluno x referência)
   let modoAtual = '1cam';
   let nomeArquivoUnico = 'Nenhum vídeo carregado';
   let nomeArquivoAtxt = 'Câmera A', nomeArquivoBtxt = 'Câmera B';
   function atualizarRotuloSessao(){
-    nomeArquivo.textContent = modoAtual === '2cam'
-      ? (nomeArquivoAtxt + ' + ' + nomeArquivoBtxt)
-      : nomeArquivoUnico;
+    if(modoAtual === '2cam') nomeArquivo.textContent = nomeArquivoAtxt + ' + ' + nomeArquivoBtxt;
+    else if(modoAtual === 'foto') nomeArquivo.textContent = 'Álbum de fotos (aluno ' + albumFoto.A.fotos.length + ' · referência ' + albumFoto.B.fotos.length + ')';
+    else nomeArquivo.textContent = nomeArquivoUnico;
   }
 
   // ---------- Carregar vídeo ----------
@@ -1206,11 +1352,15 @@
     ferramenta = b.dataset.fer;
     pontosAngulo = [];
     pontosAnguloA = []; pontosAnguloB = [];
+    limparAnguloEmProgressoFoto();
     formaSelecionada = null; alcaArrastando = null;
     formaSelecionadaDuo = null; camSelecionadaDuo = null; alcaArrastandoDuo = null;
+    formaSelecionadaFoto = null; ladoSelecionadoFoto = null; alcaArrastandoFoto = null;
     tela.classList.toggle('modo-mao', ferramenta === 'mao');
     telaA.classList.toggle('modo-mao', ferramenta === 'mao');
     telaB.classList.toggle('modo-mao', ferramenta === 'mao');
+    telaFotoA.classList.toggle('modo-mao', ferramenta === 'mao');
+    telaFotoB.classList.toggle('modo-mao', ferramenta === 'mao');
     if(ferramenta === 'angulo') mostrarDicaFerramenta('Ângulo: clique em 3 pontos — extremidade, vértice (articulação), extremidade');
     else if(ferramenta === 'rastro') mostrarDicaFerramenta('Rastro: pause perto do início do golpe e clique na bola. A cada clique avanço 1 quadro sozinho.');
     else if(ferramenta === 'zoom') mostrarDicaFerramenta('Zoom: clique onde quer aproximar (2×, 3×, 4×). Esc volta ao normal.');
@@ -1230,7 +1380,10 @@
   function alternarApontador(){
     apontadorAtivo = !apontadorAtivo;
     btnApontador.classList.toggle('ativo', apontadorAtivo);
-    if(!apontadorAtivo){ trilhaApontador = []; trilhaApontadorA = []; trilhaApontadorB = []; }
+    if(!apontadorAtivo){
+      trilhaApontador = []; trilhaApontadorA = []; trilhaApontadorB = [];
+      trilhaApontadorFotoA = []; trilhaApontadorFotoB = [];
+    }
   }
   function desfazer(){
     if(modoAtual === '2cam'){
@@ -1244,6 +1397,13 @@
         if(ferramenta === 'rastro' && rastroB.length) rastroB.pop();
         else anotacoesB.pop();
       }
+    } else if(modoAtual === 'foto'){
+      // Anotações são independentes por FOTO (não por lado): desfaz na última
+      // foto/lado onde o coach desenhou (rastreado em ultimoLadoFoto). Não há
+      // ferramenta "rastro" aqui, então é sempre a última forma da foto.
+      if(!ultimoLadoFoto) return;
+      const foto = fotoAtual(ultimoLadoFoto);
+      if(foto && foto.anotacoes.length) foto.anotacoes.pop();
     } else {
       if(ferramenta === 'rastro' && rastro.length) rastro.pop();
       else anotacoes.pop();
@@ -1256,6 +1416,15 @@
       ultimaCamDuo = null;
       formaSelecionadaDuo = null; camSelecionadaDuo = null; alcaArrastandoDuo = null;
     }
+    else if(modoAtual === 'foto'){
+      // Limpa só a foto que está sendo exibida em cada lado agora — as
+      // outras fotos do álbum mantêm suas próprias marcações intactas.
+      ['A','B'].forEach(lado => {
+        const foto = fotoAtual(lado);
+        if(foto){ foto.anotacoes = []; foto.pontosAngulo = []; }
+      });
+      formaSelecionadaFoto = null; ladoSelecionadoFoto = null; alcaArrastandoFoto = null;
+    }
     else {
       anotacoes = []; pontosAngulo = []; rastro = [];
       formaSelecionada = null; alcaArrastando = null;
@@ -1263,8 +1432,16 @@
   }
   function mostrarDica(t){ dica.textContent = t; dica.classList.add('visivel'); }
   function esconderDica(){ dica.classList.remove('visivel'); }
-  function mostrarDicaAtual(t){ modoAtual === '2cam' ? mostrarDicaDuo(t) : mostrarDica(t); }
-  function esconderDicaAtual(){ modoAtual === '2cam' ? esconderDicaDuo() : esconderDica(); }
+  function mostrarDicaAtual(t){
+    if(modoAtual === '2cam') mostrarDicaDuo(t);
+    else if(modoAtual === 'foto') mostrarDicaFoto(t);
+    else mostrarDica(t);
+  }
+  function esconderDicaAtual(){
+    if(modoAtual === '2cam') esconderDicaDuo();
+    else if(modoAtual === 'foto') esconderDicaFoto();
+    else esconderDica();
+  }
 
   // As dicas de ferramenta (explicando "Ângulo", "Mover" etc ao escolher a
   // ferramenta) ficavam presas na tela pra sempre, porque só eram escondidas
@@ -1331,7 +1508,7 @@
     if(!document.fullscreenElement) document.documentElement.requestFullscreen();
     else document.exitFullscreen();
   }
-  document.addEventListener('fullscreenchange', () => setTimeout(() => { ajustarTela(); ajustarTelaDuo(); }, 60));
+  document.addEventListener('fullscreenchange', () => setTimeout(() => { ajustarTela(); ajustarTelaDuo(); ajustarTelaFoto('A'); ajustarTelaFoto('B'); }, 60));
   const btnModoLimpo = document.getElementById('btnModoLimpo');
   btnModoLimpo.addEventListener('click', alternarModoLimpo);
   function alternarModoLimpo(){
@@ -1339,7 +1516,8 @@
     const ativo = document.body.classList.contains('limpo');
     btnModoLimpo.classList.toggle('ativo', ativo);
     duoModoLimpoBtn.classList.toggle('ativo', ativo);
-    setTimeout(() => { ajustarTela(); ajustarTelaDuo(); }, 60);
+    fotoModoLimpoBtn.classList.toggle('ativo', ativo);
+    setTimeout(() => { ajustarTela(); ajustarTelaDuo(); ajustarTelaFoto('A'); ajustarTelaFoto('B'); }, 60);
   }
 
   // ================================================================
@@ -1396,6 +1574,7 @@
     if(preparandoRec) return;              // ainda pedindo permissão do mic
     if(emGravacao) pararGravacao();
     else if(modoAtual === '2cam') iniciarGravacaoDuo();
+    else if(modoAtual === 'foto') return;  // sem narração contínua sobre foto parada; botão fica oculto no header nesse modo
     else iniciarGravacao();
   });
 
@@ -1451,6 +1630,36 @@
   // A/só B) usado na gravação em dupla, pra o print sair igual ao que o
   // coach está vendo na tela naquele instante.
   function capturarQuadroAtualDuo(){
+    // Uma câmera carregada por link é um iframe cross-origin: o navegador
+    // não deixa ler os pixels dele (nem deveria — respeitamos isso). Então,
+    // com um link envolvido, o print vira uma captura "estilo 1 câmera" só
+    // da câmera que for vídeo de verdade (capturarPrint já barra o caso das
+    // duas serem link antes de chegar aqui).
+    if(linkAtivoA || linkAtivoB){
+      const cam = linkAtivoA ? 'B' : 'A';
+      const v = cam === 'A' ? videoA : videoB;
+      if(!v.src) return null;
+      const telaWCam = cam === 'A' ? telaWA : telaWB;
+      const W = v.videoWidth || 1280, H = v.videoHeight || 720;
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const cx = c.getContext('2d');
+      const escala = W / telaWCam;
+      if(zoomDuo.z > 1){
+        const sw = W/zoomDuo.z, sh = H/zoomDuo.z;
+        const sx = zoomDuo.lx*W, sy = zoomDuo.ly*H;
+        cx.setTransform(1,0,0,1,0,0);
+        cx.drawImage(v, sx, sy, sw, sh, 0, 0, W, H);
+        cx.setTransform(zoomDuo.z, 0, 0, zoomDuo.z, -sx*zoomDuo.z, -sy*zoomDuo.z);
+        desenharTudoDuo(cx, W, H, escala, v.currentTime || 0, cam, false);
+        cx.setTransform(1,0,0,1,0,0);
+      } else {
+        cx.drawImage(v, 0, 0, W, H);
+        desenharTudoDuo(cx, W, H, escala, v.currentTime || 0, cam, false);
+      }
+      desenharWebcamPip(cx, W, H);
+      return c;
+    }
     const WA = videoA.videoWidth || 1280, HA = videoA.videoHeight || 720;
     const WB = videoB.videoWidth || 1280, HB = videoB.videoHeight || 720;
     let W, H;
@@ -1538,15 +1747,32 @@
   async function capturarPrint(){
     if(preparandoPrint) return;
     const duo = modoAtual === '2cam';
+    const foto = modoAtual === 'foto';
     if(duo){
-      if(!videoA.src || !videoB.src){ mostrarDicaDuo('Carregue os dois vídeos antes de tirar o print'); setTimeout(esconderDicaDuo,2500); return; }
+      if(linkAtivoA && linkAtivoB){
+        mostrarDicaDuo('Não é possível exportar um vídeo carregado por link — isso só funciona com vídeos carregados como arquivo');
+        setTimeout(esconderDicaDuo, 3200);
+        return;
+      }
+      if(linkAtivoA || linkAtivoB){
+        // Uma das câmeras é link: o print sai "estilo 1 câmera", só da que
+        // for vídeo de verdade — só precisa checar que essa está carregada.
+        const v = linkAtivoA ? videoB : videoA;
+        if(!v.src){ mostrarDicaDuo('Carregue o vídeo da câmera restante antes de tirar o print'); setTimeout(esconderDicaDuo,2500); return; }
+      } else if(!videoA.src || !videoB.src){ mostrarDicaDuo('Carregue os dois vídeos antes de tirar o print'); setTimeout(esconderDicaDuo,2500); return; }
+    } else if(foto){
+      // Diferente do duo (que exige os dois vídeos), aqui basta ter pelo
+      // menos UMA foto num dos dois lados — comparar é o ideal, mas analisar
+      // só o aluno (ou só a referência) também é um uso válido.
+      if(!fotoAtual('A') && !fotoAtual('B')){ mostrarDicaFoto('Adicione ao menos uma foto antes de tirar o print'); setTimeout(esconderDicaFoto,2500); return; }
     } else if(!video.src){
       mostrarDica('Carregue um vídeo antes de tirar o print'); setTimeout(esconderDica,2500); return;
     }
     preparandoPrint = true;
-    dispararFlash(duo ? flashPrintDuo : flashPrint);
+    dispararFlash(duo ? flashPrintDuo : foto ? flashPrintFoto : flashPrint);
     try{
-      const canvas = duo ? capturarQuadroAtualDuo() : capturarQuadroAtual();
+      const canvas = duo ? capturarQuadroAtualDuo() : foto ? capturarQuadroAtualFoto() : capturarQuadroAtual();
+      if(!canvas){ avisar('Não consegui gerar a imagem do print. Tente de novo.'); return; }
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
       if(!blob){ avisar('Não consegui gerar a imagem do print. Tente de novo.'); return; }
       await salvarImagem(blob, nomeArquivoPrint());
@@ -1661,7 +1887,23 @@
   // lado (cada uma na sua resolução nativa), com as anotações de cada uma
   // desenhadas na sua própria metade, e mistura o microfone com o áudio dos vídeos.
   async function iniciarGravacaoDuo(){
-    if(!videoA.src || !videoB.src){ mostrarDicaDuo('Carregue os dois vídeos antes de gravar'); setTimeout(esconderDicaDuo,2500); return; }
+    // Uma câmera carregada por link é um iframe cross-origin: não dá (nem
+    // deveria dar) pra capturar os pixels dela numa gravação. Com um link
+    // envolvido, a gravação vira "estilo 1 câmera", só da câmera que for
+    // vídeo de verdade; com as duas sendo link, não há nada pra gravar.
+    if(linkAtivoA && linkAtivoB){
+      mostrarDicaDuo('Não é possível gravar um vídeo carregado por link — isso só funciona com vídeos carregados como arquivo');
+      setTimeout(esconderDicaDuo, 3200);
+      return;
+    }
+    const linkModo = linkAtivoA || linkAtivoB;
+    const camReal = linkAtivoA ? 'B' : 'A'; // só é usada quando linkModo é true
+    if(linkModo){
+      const vReal = camReal === 'A' ? videoA : videoB;
+      if(!vReal.src){ mostrarDicaDuo('Carregue o vídeo da câmera restante antes de gravar'); setTimeout(esconderDicaDuo,2500); return; }
+    } else if(!videoA.src || !videoB.src){
+      mostrarDicaDuo('Carregue os dois vídeos antes de gravar'); setTimeout(esconderDicaDuo,2500); return;
+    }
     if(typeof MediaRecorder === 'undefined'){ alert('Seu navegador não suporta gravação. Use Chrome ou Edge atualizados.'); return; }
     preparandoRec = true;
 
@@ -1678,12 +1920,15 @@
     // Canvas composto: no layout "lado a lado" as duas câmeras ficam uma do
     // lado da outra, cada uma na própria resolução nativa; nos layouts "só
     // A"/"só B" a gravação captura apenas a câmera visível, em tela cheia —
-    // a gravação sempre acompanha o que está sendo mostrado na tela.
+    // a gravação sempre acompanha o que está sendo mostrado na tela. Com um
+    // link envolvido, força o layout efetivo pra "só a câmera real": o outro
+    // lado não tem pixels pra desenhar de qualquer forma.
     const WA = videoA.videoWidth || 1280, HA = videoA.videoHeight || 720;
     const WB = videoB.videoWidth || 1280, HB = videoB.videoHeight || 720;
+    const layoutEfetivo = linkModo ? camReal : layoutDuo;
     let W, H;
-    if(layoutDuo === 'A'){ W = WA; H = HA; }
-    else if(layoutDuo === 'B'){ W = WB; H = HB; }
+    if(layoutEfetivo === 'A'){ W = WA; H = HA; }
+    else if(layoutEfetivo === 'B'){ W = WB; H = HB; }
     else { W = WA + WB; H = Math.max(HA, HB); }
     canvasRec = document.createElement('canvas');
     canvasRec.width = W; canvasRec.height = H;
@@ -1715,9 +1960,9 @@
       ctxRec.fillStyle = '#000';
       ctxRec.fillRect(0,0,W,H);
 
-      if(layoutDuo === 'A'){
+      if(layoutEfetivo === 'A'){
         desenharCameraNaGravacao('A', 0, WA, HA, escalaA);
-      } else if(layoutDuo === 'B'){
+      } else if(layoutEfetivo === 'B'){
         desenharCameraNaGravacao('B', 0, WB, HB, escalaB);
       } else {
         desenharCameraNaGravacao('A', 0, WA, HA, escalaA);
@@ -1730,6 +1975,8 @@
     quadroRecDuo();
 
     // Mixagem de áudio: microfone + áudio da câmera A + áudio da câmera B
+    // (uma câmera de link não entra aqui — não há elemento de mídia
+    // acessível por trás do iframe pra puxar áudio dela).
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if(audioCtx.state === 'suspended') await audioCtx.resume();
     const destino = audioCtx.createMediaStreamDestination();
@@ -1738,16 +1985,19 @@
     micGain.gain.value = duoVolMic.value / 100;
     mic.connect(micGain);
     micGain.connect(destino);
-    try{
-      if(!fonteVideoA){
-        fonteVideoA = audioCtx.createMediaElementSource(videoA);
-        fonteVideoA.connect(audioCtx.destination);
-      }
-      fonteVideoA.connect(destino);
-    }catch(e){ /* alguns navegadores bloqueiam; segue sem esse áudio */ }
+    if(!linkAtivoA){
+      try{
+        if(!fonteVideoA){
+          fonteVideoA = audioCtx.createMediaElementSource(videoA);
+          fonteVideoA.connect(audioCtx.destination);
+        }
+        fonteVideoA.connect(destino);
+      }catch(e){ /* alguns navegadores bloqueiam; segue sem esse áudio */ }
+    }
     // Câmera B só entra na mixagem se o coach tiver ativado o áudio dela
-    // (por padrão fica muda para não duplicar/ecoar o som da Câmera A).
-    if(!videoB.muted){
+    // (por padrão fica muda para não duplicar/ecoar o som da Câmera A) e se
+    // ela não for um link.
+    if(!linkAtivoB && !videoB.muted){
       try{
         if(!fonteVideoB){
           fonteVideoB = audioCtx.createMediaElementSource(videoB);
@@ -1790,11 +2040,13 @@
       const s = Math.floor((Date.now()-inicioRec)/1000);
       tempoRec.textContent = '● ' + String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
     }, 500);
-    const msgGravacao = layoutDuo === 'A'
-      ? 'Gravando a Câmera A com narração'
-      : layoutDuo === 'B'
-        ? 'Gravando a Câmera B com narração'
-        : 'Gravando as duas câmeras com narração — a gravação junta as duas lado a lado, sem os painéis';
+    const msgGravacao = linkModo
+      ? 'Gravando só a Câmera ' + camReal + ' com narração — a câmera carregada por link não entra na gravação'
+      : layoutEfetivo === 'A'
+        ? 'Gravando a Câmera A com narração'
+        : layoutEfetivo === 'B'
+          ? 'Gravando a Câmera B com narração'
+          : 'Gravando as duas câmeras com narração — a gravação junta as duas lado a lado, sem os painéis';
     mostrarDicaDuo(msgGravacao);
     setTimeout(esconderDicaDuo, 3500);
   }
@@ -1930,8 +2182,8 @@
   // (caneta, linha, seta, círculo, ângulo, rastro) são INDEPENDENTES por
   // câmera: o que é desenhado na Câmera A fica só na A, e vice-versa. O
   // zoom continua espelhado nas duas, por ser só enquadramento visual.
+  const btnModo1Cam = document.getElementById('btnModo1Cam');
   const btnModo2Cam = document.getElementById('btnModo2Cam');
-  const txtModo2Cam = document.getElementById('txtModo2Cam');
   const envoltorio1Cam = document.getElementById('envoltorio1Cam');
   const duoEnvoltorio = document.getElementById('duoEnvoltorio');
   const btnTrocarVideoHeader = document.getElementById('btnTrocarVideo');
@@ -1951,6 +2203,14 @@
   const inputA = document.querySelector('[data-cam-input="A"]');
   const inputB = document.querySelector('[data-cam-input="B"]');
   const dicaDuo = document.getElementById('dicaDuo');
+  const linkFrameA = document.getElementById('linkFrameA');
+  const linkFrameB = document.getElementById('linkFrameB');
+  const inputLinkA = document.querySelector('[data-link-input="A"]');
+  const inputLinkB = document.querySelector('[data-link-input="B"]');
+  const passoA = document.getElementById('passoA');
+  const passoB = document.getElementById('passoB');
+  const tempoIndivA = document.getElementById('tempoIndivA');
+  const tempoIndivB = document.getElementById('tempoIndivB');
 
   const duoBarra = document.getElementById('duoBarra');
   const duoTempoEl = document.getElementById('duoTempo');
@@ -2048,11 +2308,133 @@
     aplicarLayoutDuo(layoutAnterior);
   }));
 
+  // ---- Câmera carregada por LINK (YouTube/Instagram) em vez de arquivo ----
+  // Pensado pro coach comparar o aluno com um vídeo público (ex: um
+  // profissional no YouTube) sem precisar baixar nada. Como o player vem
+  // dentro de um <iframe> de outra origem, o navegador NUNCA deixa a gente
+  // ler os pixels dele — então esse lado vira "só assistir": nada de
+  // desenho, zoom digital, print, gravação, play/pause ou passo de quadro
+  // por aqui. O coach usa os controles nativos do próprio player, dentro
+  // do iframe. Ver os no-ops espalhados por alternarPlayDuo, passoQuadroDuo,
+  // sincronizarReproducaoDuo, lacoDuo, capturarQuadroAtualDuo etc.
+  let linkAtivoA = false, linkAtivoB = false;
+  function camEhLink(cam){ return cam === 'A' ? linkAtivoA : linkAtivoB; }
+
+  // Extrai o ID de vídeo de uma URL do YouTube nos formatos mais comuns:
+  // watch?v=ID (com outros parâmetros antes/depois, tipo &t=30s), youtu.be/ID
+  // e /shorts/ID.
+  function extrairIdYoutube(url){
+    const m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+    return m ? m[1] : null;
+  }
+  // Extrai tipo (post/reel) + código de uma URL pública do Instagram.
+  function extrairInstagram(url){
+    const m = url.match(/instagram\.com\/(p|reel)\/([A-Za-z0-9_-]+)/);
+    return m ? { tipo: m[1], codigo: m[2] } : null;
+  }
+  // Monta a URL de embed oficial (a forma sancionada pelas duas plataformas
+  // de mostrar o vídeo delas em outro site) a partir do link colado pelo
+  // coach. Devolve null se não reconhecer o link.
+  function montarEmbedUrl(url){
+    const idYt = extrairIdYoutube(url);
+    if(idYt) return 'https://www.youtube.com/embed/' + idYt + '?rel=0';
+    const ig = extrairInstagram(url);
+    if(ig) return 'https://www.instagram.com/' + ig.tipo + '/' + ig.codigo + '/embed';
+    return null;
+  }
+
+  function carregarLinkDuo(urlDigitada, cam){
+    const embedUrl = montarEmbedUrl((urlDigitada || '').trim());
+    if(!embedUrl){
+      mostrarDicaDuo('Não reconheci esse link — cole um link público do YouTube ou Instagram');
+      setTimeout(esconderDicaDuo, 3200);
+      return;
+    }
+    const v = cam === 'A' ? videoA : videoB;
+    const envio = cam === 'A' ? areaEnvioA : areaEnvioB;
+    const frame = cam === 'A' ? linkFrameA : linkFrameB;
+    const zoomWrap = cam === 'A' ? zoomWrapA : zoomWrapB;
+    const passoDiv = cam === 'A' ? passoA : passoB;
+    const tempoIndiv = cam === 'A' ? tempoIndivA : tempoIndivB;
+
+    // Se já havia um vídeo de arquivo tocando nesse slot, descarta antes de
+    // trocar pelo link.
+    v.pause(); v.removeAttribute('src'); v.load();
+    if(cam === 'A'){
+      nomeArquivoAtxt = 'Link (Câmera A)';
+      anotacoesA = []; pontosAnguloA = []; rastroA = [];
+      linkAtivoA = true;
+    } else {
+      nomeArquivoBtxt = 'Link (Câmera B)';
+      anotacoesB = []; pontosAnguloB = []; rastroB = [];
+      linkAtivoB = true;
+    }
+
+    frame.src = embedUrl;
+    frame.style.display = 'block';
+    zoomWrap.style.display = 'none';
+    passoDiv.style.display = 'none';
+    tempoIndiv.style.display = 'none';
+    envio.style.display = 'none';
+    atualizarRotuloSessao();
+    ajustarTelaDuo();
+    mostrarDicaDuo('Vídeo carregado por link na Câmera ' + cam + ' — use os controles do próprio player pra tocar/pausar');
+    setTimeout(esconderDicaDuo, 3600);
+  }
+  document.querySelector('[data-link-btn="A"]').addEventListener('click', () => carregarLinkDuo(inputLinkA.value, 'A'));
+  document.querySelector('[data-link-btn="B"]').addEventListener('click', () => carregarLinkDuo(inputLinkB.value, 'B'));
+  inputLinkA.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); carregarLinkDuo(inputLinkA.value, 'A'); } });
+  inputLinkB.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); carregarLinkDuo(inputLinkB.value, 'B'); } });
+
+  // Volta um slot para o estado de envio (mostra de novo "Escolher vídeo" +
+  // "colar um link"), seja ele um link ativo ou um vídeo de arquivo normal.
+  function resetarCamParaEnvio(cam){
+    const v = cam === 'A' ? videoA : videoB;
+    const envio = cam === 'A' ? areaEnvioA : areaEnvioB;
+    const frame = cam === 'A' ? linkFrameA : linkFrameB;
+    const zoomWrap = cam === 'A' ? zoomWrapA : zoomWrapB;
+    const passoDiv = cam === 'A' ? passoA : passoB;
+    const tempoIndiv = cam === 'A' ? tempoIndivA : tempoIndivB;
+    v.pause(); v.removeAttribute('src'); v.load();
+    frame.removeAttribute('src'); frame.style.display = 'none';
+    zoomWrap.style.display = '';
+    passoDiv.style.display = '';
+    tempoIndiv.style.display = '';
+    if(cam === 'A'){ linkAtivoA = false; nomeArquivoAtxt = 'Câmera A'; }
+    else { linkAtivoB = false; nomeArquivoBtxt = 'Câmera B'; }
+    envio.style.display = '';
+    atualizarRotuloSessao();
+    ajustarTelaDuo();
+  }
+  // Botão "Trocar vídeo" de cada câmera: numa câmera normal, abre direto o
+  // seletor de arquivo (comportamento de sempre). Numa câmera com link ativo
+  // não faz sentido "reabrir o seletor de arquivo" sozinho — volta pro
+  // estado de envio, que mostra as duas opções (arquivo OU link) de novo.
+  function trocarCam(cam){
+    if(camEhLink(cam)){ resetarCamParaEnvio(cam); return; }
+    const input = cam === 'A' ? inputA : inputB;
+    input.click();
+  }
+
   // ---- Carregar vídeo de cada câmera ----
   function carregarArquivoDuo(arq, cam){
     if(!arq || !arq.type.startsWith('video')) return;
     const v = cam === 'A' ? videoA : videoB;
     const envio = cam === 'A' ? areaEnvioA : areaEnvioB;
+    // Se esse slot estava mostrando um link, desfaz o estado de link antes
+    // de carregar o arquivo (permite trocar um link por um vídeo de verdade
+    // sem passar por "Trocar vídeo" primeiro, ex: soltando o arquivo ali).
+    if(camEhLink(cam)){
+      const frame = cam === 'A' ? linkFrameA : linkFrameB;
+      const zoomWrap = cam === 'A' ? zoomWrapA : zoomWrapB;
+      const passoDiv = cam === 'A' ? passoA : passoB;
+      const tempoIndiv = cam === 'A' ? tempoIndivA : tempoIndivB;
+      frame.removeAttribute('src'); frame.style.display = 'none';
+      zoomWrap.style.display = '';
+      passoDiv.style.display = '';
+      tempoIndiv.style.display = '';
+      if(cam === 'A') linkAtivoA = false; else linkAtivoB = false;
+    }
     v.src = URL.createObjectURL(arq);
     if(cam === 'A'){
       nomeArquivoAtxt = arq.name;
@@ -2069,8 +2451,8 @@
   }
   document.querySelector('[data-cam-btn="A"]').addEventListener('click', () => inputA.click());
   document.querySelector('[data-cam-btn="B"]').addEventListener('click', () => inputB.click());
-  document.querySelector('[data-cam-trocar="A"]').addEventListener('click', () => inputA.click());
-  document.querySelector('[data-cam-trocar="B"]').addEventListener('click', () => inputB.click());
+  document.querySelector('[data-cam-trocar="A"]').addEventListener('click', () => trocarCam('A'));
+  document.querySelector('[data-cam-trocar="B"]').addEventListener('click', () => trocarCam('B'));
   inputA.addEventListener('change', e => carregarArquivoDuo(e.target.files[0], 'A'));
   inputB.addEventListener('change', e => carregarArquivoDuo(e.target.files[0], 'B'));
   document.querySelectorAll('.duo-cam').forEach(painel => {
@@ -2117,12 +2499,16 @@
     zoomDuo.ly = Math.min(Math.max(zoomDuo.cy - vis/2, 0), 1 - vis);
     const ox = (zoomDuo.lx / (1 - vis)) * 100;
     const oy = (zoomDuo.ly / (1 - vis)) * 100;
-    [zoomWrapA, zoomWrapB].forEach(w => {
+    // O zoom digital do app é só enquadramento sobre o <video> — não faz
+    // sentido (e não tem por quê) aplicar sobre um iframe de link, que já
+    // fica oculto (zoom-wrap com display:none) enquanto o link está ativo.
+    [['A', zoomWrapA, zoomChipA], ['B', zoomWrapB, zoomChipB]].forEach(([cam, w, chip]) => {
+      if(camEhLink(cam)){ w.style.transform = ''; chip.classList.remove('visivel'); return; }
       w.style.transformOrigin = ox + '% ' + oy + '%';
       w.style.transform = 'scale(' + zoomDuo.z + ')';
+      chip.textContent = 'Zoom ' + zoomDuo.z + '×';
+      chip.classList.add('visivel');
     });
-    zoomChipA.textContent = zoomChipB.textContent = 'Zoom ' + zoomDuo.z + '×';
-    zoomChipA.classList.add('visivel'); zoomChipB.classList.add('visivel');
   }
   function zerarZoomDuo(){ zoomDuo.z = 1; aplicarZoomDuo(); }
 
@@ -2151,11 +2537,13 @@
 
   function lacoDuo(){
     if(modoAtual === '2cam'){
-      if(layoutDuo !== 'B'){
+      // Câmera carregada por link: nada pra desenhar (o canvas fica oculto
+      // e não há pixels de vídeo pra ler de dentro do iframe cross-origin).
+      if(layoutDuo !== 'B' && !linkAtivoA){
         ctxTelaA.clearRect(0,0,telaWA,telaHA);
         desenharTudoDuo(ctxTelaA, telaWA, telaHA, 1, videoA.currentTime || 0, 'A', true);
       }
-      if(layoutDuo !== 'A'){
+      if(layoutDuo !== 'A' && !linkAtivoB){
         ctxTelaB.clearRect(0,0,telaWB,telaHB);
         desenharTudoDuo(ctxTelaB, telaWB, telaHB, 1, videoB.currentTime || 0, 'B', true);
       }
@@ -2359,6 +2747,17 @@
 
   // ---- Reprodução sincronizada (A = referência, B segue com defasagem) ----
   function alternarPlayDuo(){
+    // Uma câmera carregada por link não tem API de play/pause acessível
+    // daqui (é um iframe cross-origin) — o botão compartilhado só controla
+    // a câmera que for vídeo de verdade; se as duas forem link, não há
+    // nada pra esse botão fazer.
+    if(linkAtivoA || linkAtivoB){
+      if(linkAtivoA && linkAtivoB) return;
+      const v = linkAtivoA ? videoB : videoA;
+      if(!v.src) return;
+      if(v.paused) v.play(); else v.pause();
+      return;
+    }
     if(!videoA.src || !videoB.src) return;
     const pausado = layoutDuo === 'B' ? videoB.paused : videoA.paused;
     if(pausado){
@@ -2380,7 +2779,11 @@
   videoB.addEventListener('play', atualizarIconePlayDuo);
   videoB.addEventListener('pause', atualizarIconePlayDuo);
   function atualizarIconePlayDuo(){
-    const tocando = layoutDuo === 'B' ? !videoB.paused : !videoA.paused;
+    let tocando;
+    if(linkAtivoA && linkAtivoB) tocando = false;
+    else if(linkAtivoA) tocando = !videoB.paused;
+    else if(linkAtivoB) tocando = !videoA.paused;
+    else tocando = layoutDuo === 'B' ? !videoB.paused : !videoA.paused;
     duoIcoPlay.style.display = tocando ? 'none' : 'block';
     duoIcoPause.style.display = tocando ? 'block' : 'none';
   }
@@ -2424,7 +2827,11 @@
   let ultimoAjusteRateDuo = 0;
   let corrigindoVelocidadeB = false;
   function sincronizarReproducaoDuo(){
-    if(!videoA.src || !videoB.src || layoutDuo !== 'ambas' || videoA.paused){
+    // Nada pra sincronizar quando uma das câmeras é um link: já não há um
+    // <video> de verdade do outro lado (videoX.src fica vazio nesse caso),
+    // então essa condição já cobre o caso — linkAtivoA/B só deixam a
+    // intenção explícita.
+    if(linkAtivoA || linkAtivoB || !videoA.src || !videoB.src || layoutDuo !== 'ambas' || videoA.paused){
       corrigindoVelocidadeB = false;
       if(videoB.playbackRate !== (videoA.playbackRate || 1)) videoB.playbackRate = videoA.playbackRate || 1;
       return;
@@ -2463,6 +2870,16 @@
   }
 
   function passoQuadroDuo(dir){
+    // Câmera de link não anda "quadro a quadro" por aqui — quem controla é
+    // o próprio player embutido. Se as duas forem link, não há o que fazer.
+    if(linkAtivoA || linkAtivoB){
+      if(linkAtivoA && linkAtivoB) return;
+      const v = linkAtivoA ? videoB : videoA;
+      if(!v.src) return;
+      v.pause();
+      v.currentTime = Math.min(Math.max(v.currentTime + dir/FPS, 0), v.duration || 0);
+      return;
+    }
     if(!videoA.src || !videoB.src) return;
     videoA.pause(); videoB.pause();
     videoA.currentTime = Math.min(Math.max(videoA.currentTime + dir/FPS, 0), videoA.duration || 0);
@@ -2498,9 +2915,15 @@
 
   // ---- Linha do tempo (câmera A é a referência) ----
   function atualizarTempoDuo(){
-    duoTempoEl.textContent = fmt(videoA.currentTime) + ' / ' + fmt(videoA.duration);
-    if(videoA.duration){
-      const pct = (videoA.currentTime / videoA.duration) * 1000;
+    // A linha do tempo compartilhada (topo) normalmente usa a Câmera A como
+    // referência. Se A for um link (sem <video> de verdade por trás), não
+    // tem currentTime/duration pra mostrar — usa B nesse caso, se ela for
+    // vídeo de verdade. Se as duas forem link, fica só zerada (fmt(NaN)=0).
+    const camRefTempo = (linkAtivoA && !linkAtivoB) ? 'B' : 'A';
+    const vRefTempo = camRefTempo === 'A' ? videoA : videoB;
+    duoTempoEl.textContent = fmt(vRefTempo.currentTime) + ' / ' + fmt(vRefTempo.duration);
+    if(vRefTempo.duration){
+      const pct = (vRefTempo.currentTime / vRefTempo.duration) * 1000;
       duoBarra.value = pct;
       duoBarra.style.setProperty('--prog', (pct/10) + '%');
     }
@@ -2521,9 +2944,18 @@
     }
   }
   duoBarra.addEventListener('input', () => {
+    // Mesma referência usada em atualizarTempoDuo: se A é link, arrasta B
+    // sozinha (sem aplicar defasagem, que só faz sentido entre dois vídeos
+    // de verdade); caso contrário, comportamento de sempre.
+    const camRefTempo = (linkAtivoA && !linkAtivoB) ? 'B' : 'A';
+    if(camRefTempo === 'B'){
+      if(!videoB.duration) return;
+      videoB.currentTime = (duoBarra.value/1000) * videoB.duration;
+      return;
+    }
     if(!videoA.duration) return;
     videoA.currentTime = (duoBarra.value/1000) * videoA.duration;
-    videoB.currentTime = Math.min(Math.max(videoA.currentTime + defasagem, 0), videoB.duration || 0);
+    if(!linkAtivoB) videoB.currentTime = Math.min(Math.max(videoA.currentTime + defasagem, 0), videoB.duration || 0);
   });
   // Barras individuais: mexem SÓ na câmera correspondente (não aplicam a
   // defasagem nem tocam na outra câmera) — pausa as duas pra não conflitar
@@ -2567,39 +2999,572 @@
 
   duoModoLimpoBtn.addEventListener('click', alternarModoLimpo);
 
-  // ---- Alternar entre modo 1 câmera e modo 2 câmeras ----
-  function alternarModo2Cam(){
+  // ================================================================
+  // MODO FOTOS — análise de fotos paradas, tipo um pequeno álbum por lado
+  // ================================================================
+  // Ideia: às vezes o coach não tem vídeo, só fotos (ex: prints tirados na
+  // hora, ou a imagem de um profissional pra comparar). O layout reaproveita
+  // a mesma estrutura visual do modo 2 câmeras (dois painéis lado a lado),
+  // mas cada painel agora é um ÁLBUM: uma lista de fotos que o coach pode
+  // percorrer com "anterior/próxima", em vez de um vídeo com linha do tempo.
+  // Lado A = fotos do aluno; lado B = conteúdo externo (tipicamente um print
+  // da técnica de um jogador profissional), pra comparação lado a lado.
+  //
+  // A diferença mais importante em relação ao vídeo: no vídeo as anotações
+  // são UM overlay contínuo (o mesmo `anotacoesA`/`anotacoesB` vale pra
+  // qualquer quadro, porque é sempre a mesma cena). Numa foto isso não faz
+  // sentido — cada foto do álbum é uma cena diferente, então cada uma
+  // precisa guardar o PRÓPRIO conjunto de marcações. Por isso cada item do
+  // álbum é um objetinho {src, anotacoes, pontosAngulo, formaAtual}, e
+  // trocar de foto simplesmente troca qual desses objetos está "no ar".
+  const btnModoFoto = document.getElementById('btnModoFoto');
+  const fotoEnvoltorio = document.getElementById('fotoEnvoltorio');
+  const fotoImgA = document.getElementById('fotoImgA');
+  const fotoImgB = document.getElementById('fotoImgB');
+  const telaFotoA = document.getElementById('telaFotoA');
+  const telaFotoB = document.getElementById('telaFotoB');
+  const ctxTelaFotoA = telaFotoA.getContext('2d');
+  const ctxTelaFotoB = telaFotoB.getContext('2d');
+  const zoomWrapFotoA = document.getElementById('zoomWrapFotoA');
+  const zoomWrapFotoB = document.getElementById('zoomWrapFotoB');
+  const zoomChipFotoA = document.getElementById('zoomChipFotoA');
+  const zoomChipFotoB = document.getElementById('zoomChipFotoB');
+  const areaEnvioFotoA = document.getElementById('areaEnvioFotoA');
+  const areaEnvioFotoB = document.getElementById('areaEnvioFotoB');
+  const fotoContadorA = document.getElementById('fotoContadorA');
+  const fotoContadorB = document.getElementById('fotoContadorB');
+  const fotoRemoverA = document.querySelector('[data-foto-remover="A"]');
+  const fotoRemoverB = document.querySelector('[data-foto-remover="B"]');
+  const inputFotoA = document.querySelector('[data-foto-input="A"]');
+  const inputFotoB = document.querySelector('[data-foto-input="B"]');
+  const dicaFoto = document.getElementById('dicaFoto');
+  const flashPrintFoto = document.getElementById('flashPrintFoto');
+  const fotoPalco = document.getElementById('fotoPalco');
+  const fotoPainelA = document.getElementById('fotoPainelA');
+  const fotoPainelB = document.getElementById('fotoPainelB');
+  const fotoModoLimpoBtn = document.getElementById('fotoModoLimpo');
+
+  // Pequenos "getters" pra não duplicar if/else por todo canto: dado um lado
+  // ('A' ou 'B'), devolvem o elemento correspondente daquele painel.
+  function fotoImg(lado){ return lado === 'A' ? fotoImgA : fotoImgB; }
+  function telaFoto(lado){ return lado === 'A' ? telaFotoA : telaFotoB; }
+  function zoomWrapFoto(lado){ return lado === 'A' ? zoomWrapFotoA : zoomWrapFotoB; }
+  function zoomChipFoto(lado){ return lado === 'A' ? zoomChipFotoA : zoomChipFotoB; }
+  function areaEnvioFoto(lado){ return lado === 'A' ? areaEnvioFotoA : areaEnvioFotoB; }
+  function contadorFoto(lado){ return lado === 'A' ? fotoContadorA : fotoContadorB; }
+  function botaoRemoverFoto(lado){ return lado === 'A' ? fotoRemoverA : fotoRemoverB; }
+  function telaWFoto(lado){ return lado === 'A' ? telaWFotoA : telaWFotoB; }
+  function telaHFoto(lado){ return lado === 'A' ? telaHFotoA : telaHFotoB; }
+
+  // ---- Estado: um álbum independente por lado, cada foto com sua própria
+  // "camada" de anotações (ver explicação grande acima).
+  const albumFoto = {
+    A: { fotos: [], indice: 0 },
+    B: { fotos: [], indice: 0 },
+  };
+  function fotoAtual(lado){
+    const album = albumFoto[lado];
+    return album.fotos[album.indice] || null;
+  }
+  function novaFotoVazia(src){
+    return { src, anotacoes: [], pontosAngulo: [], formaAtual: null };
+  }
+  function limparAnguloEmProgressoFoto(){
+    ['A','B'].forEach(lado => {
+      const foto = fotoAtual(lado);
+      if(foto) foto.pontosAngulo = [];
+    });
+  }
+
+  // Seleção da ferramenta "Mover": mesmo espírito do modo 2 câmeras
+  // (formaSelecionadaDuo/camSelecionadaDuo), mas como a referência aponta pra
+  // dentro do array `anotacoes` de UMA foto específica, ela fica inválida
+  // assim que o coach troca de foto — por isso toda troca de foto (navegar,
+  // adicionar, remover) desseleciona.
+  let formaSelecionadaFoto = null;
+  let ladoSelecionadoFoto = null;   // 'A' ou 'B'
+  let alcaArrastandoFoto = null;
+  let arrastarInicioFoto = null;
+  let formaInicioSnapshotFoto = null;
+  let ultimoLadoFoto = null;        // último lado onde o coach desenhou (para o Desfazer)
+  let trilhaApontadorFotoA = [], trilhaApontadorFotoB = []; // laser, ao vivo, por painel
+  let telaWFotoA = 1, telaHFotoA = 1, telaWFotoB = 1, telaHFotoB = 1;
+  // Zoom independente por lado: diferente do 2 câmeras (onde A/B são o MESMO
+  // golpe visto de ângulos diferentes, então o zoom fica espelhado), aqui A e
+  // B normalmente são fotos de coisas diferentes (aluno vs. referência), então
+  // cada painel tem seu próprio zoom.
+  const zoomFoto = {
+    A: { z:1, cx:.5, cy:.5, lx:0, ly:0 },
+    B: { z:1, cx:.5, cy:.5, lx:0, ly:0 },
+  };
+  // Qual painel o mouse tocou por último — usado pelas setas do teclado pra
+  // saber qual álbum navegar (ver atalhos mais abaixo).
+  let ladoHoverFoto = 'A';
+
+  // ---- Canvas alinhado a cada <img> (mesmo padrão de ajustarTelaDuo, só que
+  // um lado de cada vez, já que cada painel pode ter uma foto de tamanho
+  // diferente da do outro painel).
+  function ajustarTelaFoto(lado){
+    const imgEl = fotoImg(lado);
+    const t = telaFoto(lado);
+    const w = Math.max(1, imgEl.offsetWidth || 1);
+    const h = Math.max(1, imgEl.offsetHeight || 1);
+    if(lado === 'A'){ telaWFotoA = w; telaHFotoA = h; } else { telaWFotoB = w; telaHFotoB = h; }
+    t.style.left = '0px'; t.style.top = '0px';
+    t.style.width = w + 'px'; t.style.height = h + 'px';
+    const dpr = window.devicePixelRatio || 1;
+    t.width = w * dpr; t.height = h * dpr;
+    t.getContext('2d').setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', () => { ajustarTelaFoto('A'); ajustarTelaFoto('B'); });
+  new ResizeObserver(() => { ajustarTelaFoto('A'); ajustarTelaFoto('B'); }).observe(fotoPalco);
+
+  // ---- Ver só um painel em tela cheia (Aluno ou Referência), ou os dois
+  // lado a lado — mesmo padrão do "Ver" do modo 2 câmeras (aplicarLayoutDuo),
+  // só que aqui não há vídeo nem sincronia de tempo pra recalcular: cada foto
+  // já é independente por lado, então trocar de layout é só mostrar/esconder
+  // a coluna e reajustar o tamanho do canvas de cada painel visível.
+  let layoutFoto = 'ambas'; // 'ambas' | 'A' | 'B'
+  const fotoColunaA = document.getElementById('fotoColunaA');
+  const fotoColunaB = document.getElementById('fotoColunaB');
+  function aplicarLayoutFoto(){
+    fotoColunaA.style.display = layoutFoto === 'B' ? 'none' : '';
+    fotoColunaB.style.display = layoutFoto === 'A' ? 'none' : '';
+    // a coluna visível passa a ocupar 100% da largura: recalcula tamanhos
+    setTimeout(() => { ajustarTelaFoto('A'); ajustarTelaFoto('B'); }, 30);
+  }
+  // Atributo próprio (data-ver-foto, não data-ver) pra não colidir com o
+  // mesmo seletor [data-ver] já usado pelos botões "Ver" do modo 2 câmeras.
+  document.querySelectorAll('#fotoVerGrupo [data-ver-foto]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#fotoVerGrupo [data-ver-foto]').forEach(x => x.classList.remove('ativo'));
+    b.classList.add('ativo');
+    layoutFoto = b.dataset.verFoto;
+    aplicarLayoutFoto();
+  }));
+
+  // ---- Mostrar a foto "atual" de um álbum na tela (chamado ao navegar, ao
+  // adicionar fotos novas e ao remover a foto exibida) ----
+  function atualizarFotoAtual(lado){
+    const foto = fotoAtual(lado);
+    const imgEl = fotoImg(lado);
+    const envio = areaEnvioFoto(lado);
+    // Desseleciona se a forma selecionada pertencia à foto que está saindo
+    // de cena — ela deixou de fazer parte do que está visível nesse painel.
+    if(ladoSelecionadoFoto === lado){ formaSelecionadaFoto = null; ladoSelecionadoFoto = null; }
+    if(!foto){
+      imgEl.style.display = 'none';
+      imgEl.removeAttribute('src');
+      envio.style.display = '';
+      botaoRemoverFoto(lado).style.display = 'none';
+      contadorFoto(lado).textContent = 'Foto 0/0';
+      telaFoto(lado).getContext('2d').clearRect(0, 0, telaWFoto(lado), telaHFoto(lado));
+      return;
+    }
+    envio.style.display = 'none';
+    botaoRemoverFoto(lado).style.display = '';
+    contadorFoto(lado).textContent = 'Foto ' + (albumFoto[lado].indice + 1) + '/' + albumFoto[lado].fotos.length;
+    imgEl.style.display = 'block';
+    imgEl.src = foto.src;
+    // Se a imagem já estava decodificada (ex: o coach voltou pra uma foto que
+    // o navegador já tinha carregado antes), ajusta a tela na hora; senão,
+    // espera o onload — mesma lógica do vídeo esperando 'loadedmetadata'.
+    if(imgEl.complete && imgEl.naturalWidth) ajustarTelaFoto(lado);
+    imgEl.onload = () => ajustarTelaFoto(lado);
+  }
+
+  // Adiciona uma ou mais fotos ao álbum de um lado (arquivos vindos do input
+  // de arquivo OU de um drag-and-drop). NUNCA substitui o álbum — sempre
+  // acrescenta ao final, como ir colando fotos num álbum físico.
+  function adicionarFotosAlbum(lado, arquivos){
+    const imagens = Array.from(arquivos || []).filter(a => a.type && a.type.startsWith('image'));
+    if(!imagens.length) return;
+    const album = albumFoto[lado];
+    const eraVazio = album.fotos.length === 0;
+    const indicePrimeiraNova = album.fotos.length;
+    imagens.forEach(arq => album.fotos.push(novaFotoVazia(URL.createObjectURL(arq))));
+    // Álbum vazio: mostra a primeira foto que chegou. Álbum que já tinha
+    // fotos: pula direto pra primeira foto NOVA — é o que o coach quer ver
+    // depois de acabar de adicionar mais imagens.
+    album.indice = eraVazio ? 0 : indicePrimeiraNova;
+    atualizarFotoAtual(lado);
+    atualizarRotuloSessao();
+  }
+  function navegarAlbum(lado, dir){
+    const album = albumFoto[lado];
+    if(!album.fotos.length) return; // álbum vazio: nada pra navegar
+    const novoIndice = Math.min(Math.max(album.indice + dir, 0), album.fotos.length - 1);
+    if(novoIndice === album.indice) return; // já está na ponta (primeira/última): não faz nada
+    album.indice = novoIndice;
+    atualizarFotoAtual(lado);
+  }
+  function removerFotoAtual(lado){
+    const album = albumFoto[lado];
+    if(!album.fotos.length) return;
+    const [removida] = album.fotos.splice(album.indice, 1);
+    if(removida) URL.revokeObjectURL(removida.src); // libera a memória do blob
+    if(album.indice >= album.fotos.length) album.indice = Math.max(0, album.fotos.length - 1);
+    atualizarFotoAtual(lado);
+    atualizarRotuloSessao();
+  }
+
+  document.querySelector('[data-foto-btn="A"]').addEventListener('click', () => inputFotoA.click());
+  document.querySelector('[data-foto-btn="B"]').addEventListener('click', () => inputFotoB.click());
+  document.querySelector('[data-foto-add="A"]').addEventListener('click', () => inputFotoA.click());
+  document.querySelector('[data-foto-add="B"]').addEventListener('click', () => inputFotoB.click());
+  inputFotoA.addEventListener('change', e => { adicionarFotosAlbum('A', e.target.files); e.target.value = ''; });
+  inputFotoB.addEventListener('change', e => { adicionarFotosAlbum('B', e.target.files); e.target.value = ''; });
+  fotoRemoverA.addEventListener('click', () => removerFotoAtual('A'));
+  fotoRemoverB.addEventListener('click', () => removerFotoAtual('B'));
+  document.querySelectorAll('[data-foto-passo]').forEach(b => b.addEventListener('click', () => {
+    navegarAlbum(b.dataset.fotoPasso, parseInt(b.dataset.fotoDir, 10));
+  }));
+  [[fotoPainelA,'A',areaEnvioFotoA], [fotoPainelB,'B',areaEnvioFotoB]].forEach(([painel, lado, envio]) => {
+    ['dragover','dragenter'].forEach(ev => painel.addEventListener(ev, e => {
+      e.preventDefault(); envio.classList.add('arrastando');
+    }));
+    ['dragleave','drop'].forEach(ev => painel.addEventListener(ev, e => {
+      e.preventDefault(); envio.classList.remove('arrastando');
+    }));
+    painel.addEventListener('drop', e => adicionarFotosAlbum(lado, e.dataTransfer.files));
+    // Pra saber qual painel as setas do teclado devem navegar (ver atalhos)
+    painel.addEventListener('pointerenter', () => { ladoHoverFoto = lado; });
+  });
+
+  // ---- Zoom digital, independente por lado ----
+  function aplicarZoomFoto(lado){
+    const zf = zoomFoto[lado];
+    const wrap = zoomWrapFoto(lado);
+    const chip = zoomChipFoto(lado);
+    if(zf.z <= 1){
+      zf.z = 1; zf.lx = 0; zf.ly = 0;
+      wrap.style.transform = '';
+      chip.classList.remove('visivel');
+      return;
+    }
+    const vis = 1/zf.z;
+    zf.lx = Math.min(Math.max(zf.cx - vis/2, 0), 1 - vis);
+    zf.ly = Math.min(Math.max(zf.cy - vis/2, 0), 1 - vis);
+    const ox = (zf.lx / (1 - vis)) * 100;
+    const oy = (zf.ly / (1 - vis)) * 100;
+    wrap.style.transformOrigin = ox + '% ' + oy + '%';
+    wrap.style.transform = 'scale(' + zf.z + ')';
+    chip.textContent = 'Zoom ' + zf.z + '×';
+    chip.classList.add('visivel');
+  }
+  function zerarZoomFoto(lado){ zoomFoto[lado].z = 1; aplicarZoomFoto(lado); }
+
+  // ---- Desenho (reaproveita tracar()/tracarApontador()/desenharSelecao(),
+  // que já são genéricas). Sem tracarRastro aqui de propósito: Rastro precisa
+  // de um eixo de tempo pra fazer sentido, e uma foto parada não tem um.
+  function desenharTudoFoto(ctx, W, H, s, lado, mostrarSelecao){
+    const foto = fotoAtual(lado);
+    if(!foto) return;
+    foto.anotacoes.forEach(f => tracar(f, ctx, W, H, s));
+    if(foto.formaAtual) tracar(foto.formaAtual, ctx, W, H, s);
+    foto.pontosAngulo.forEach(p => {
+      ctx.fillStyle = cor;
+      ctx.beginPath(); ctx.arc(p.x*W, p.y*H, 5*s, 0, Math.PI*2); ctx.fill();
+    });
+    const trilha = lado === 'A' ? trilhaApontadorFotoA : trilhaApontadorFotoB;
+    if(apontadorAtivo) tracarApontador(ctx, W, H, s, trilha, cor);
+    if(mostrarSelecao && ferramenta === 'mao' && ladoSelecionadoFoto === lado && formaSelecionadaFoto){
+      desenharSelecao(ctx, W, H, s, formaSelecionadaFoto);
+    }
+  }
+
+  function lacoFoto(){
+    if(modoAtual === 'foto'){
+      ctxTelaFotoA.clearRect(0, 0, telaWFotoA, telaHFotoA);
+      desenharTudoFoto(ctxTelaFotoA, telaWFotoA, telaHFotoA, 1, 'A', true);
+      ctxTelaFotoB.clearRect(0, 0, telaWFotoB, telaHFotoB);
+      desenharTudoFoto(ctxTelaFotoB, telaWFotoB, telaHFotoB, 1, 'B', true);
+    }
+    requestAnimationFrame(lacoFoto);
+  }
+  requestAnimationFrame(lacoFoto);
+
+  // ---- Interação de desenho: cada FOTO tem seu próprio conjunto de
+  // anotações — desenhar na foto 3/5 não aparece na foto 1/5.
+  function posicaoFoto(e, lado){ return posicaoRelativa(e, telaFoto(lado)); }
+  function iniciarDesenhoFoto(e, lado){
+    const foto = fotoAtual(lado);
+    if(!foto) return; // sem foto carregada nesse painel: nada pra desenhar em cima
+    if(ferramenta === 'mao'){ iniciarSelecaoOuArrastoFoto(e, lado); return; }
+    if(ferramenta === 'rastro') return; // guarda extra: Rastro não existe no modo Fotos
+    e.preventDefault();
+    telaFoto(lado).setPointerCapture(e.pointerId);
+    const p = posicaoFoto(e, lado);
+
+    if(ferramenta === 'zoom'){
+      const zf = zoomFoto[lado];
+      if(zf.z >= 4){ zerarZoomFoto(lado); mostrarDicaFoto('Zoom desativado'); setTimeout(esconderDicaFoto,1500); }
+      else{
+        zf.z = zf.z < 2 ? 2 : zf.z + 1;
+        zf.cx = p.x; zf.cy = p.y;
+        aplicarZoomFoto(lado);
+      }
+      return;
+    }
+    ultimoLadoFoto = lado; // pro botão "Desfazer" saber em qual lado mexer
+    if(ferramenta === 'angulo'){
+      foto.pontosAngulo.push(p);
+      if(foto.pontosAngulo.length === 2) mostrarDicaFoto('Agora clique no fim do 2º segmento');
+      if(foto.pontosAngulo.length === 3){
+        foto.anotacoes.push({tipo:'angulo', cor, pts:foto.pontosAngulo.slice()});
+        foto.pontosAngulo = [];
+        esconderDicaFoto();
+      }
+      return;
+    }
+    if(ferramenta === 'texto'){
+      for(let i = foto.anotacoes.length - 1; i >= 0; i--){
+        const fExistente = foto.anotacoes[i];
+        if(fExistente.tipo === 'texto' && distanciaFormaPx(fExistente, p, telaWFoto(lado), telaHFoto(lado)) <= TOLERANCIA_SELECAO){
+          abrirEdicaoTexto(e.clientX, e.clientY, fExistente.cor, fExistente.texto, valor => {
+            if(valor) fExistente.texto = valor;
+            else foto.anotacoes.splice(foto.anotacoes.indexOf(fExistente), 1);
+          });
+          return;
+        }
+      }
+      abrirEdicaoTexto(e.clientX, e.clientY, cor, '', valor => {
+        if(valor) foto.anotacoes.push({tipo:'texto', cor, x:p.x, y:p.y, texto:valor});
+      });
+      return;
+    }
+    foto.formaAtual = ferramenta === 'caneta'
+      ? {tipo:'caneta', cor, pts:[p]}
+      : {tipo:ferramenta, cor, x1:p.x, y1:p.y, x2:p.x, y2:p.y};
+  }
+  function moverDesenhoFoto(e, lado){
+    if(ferramenta === 'mao'){ moverSelecaoOuArrastoFoto(e, lado); return; }
+    const foto = fotoAtual(lado);
+    if(!foto || !foto.formaAtual) return;
+    const p = posicaoFoto(e, lado);
+    if(foto.formaAtual.tipo === 'caneta') foto.formaAtual.pts.push(p);
+    else { foto.formaAtual.x2 = p.x; foto.formaAtual.y2 = p.y; }
+  }
+  function finalizarDesenhoFoto(lado){
+    if(ferramenta === 'mao'){ finalizarSelecaoOuArrastoFoto(); return; }
+    const foto = fotoAtual(lado);
+    if(foto && foto.formaAtual){ foto.anotacoes.push(foto.formaAtual); foto.formaAtual = null; }
+  }
+
+  // ---- Ferramenta Mover: seleciona e arrasta/ajusta formas dentro da foto
+  // que está sendo exibida naquele lado (cada foto tem suas próprias formas)
+  function iniciarSelecaoOuArrastoFoto(e, lado){
+    const foto = fotoAtual(lado);
+    if(!foto) return;
+    const W = telaWFoto(lado), H = telaHFoto(lado);
+    const p = posicaoFoto(e, lado);
+    if(formaSelecionadaFoto && ladoSelecionadoFoto === lado){
+      for(const a of alcasDaForma(formaSelecionadaFoto)){
+        const d = Math.hypot((a.x-p.x)*W, (a.y-p.y)*H);
+        if(d <= TOLERANCIA_SELECAO){
+          alcaArrastandoFoto = a.ref;
+          arrastarInicioFoto = p;
+          formaInicioSnapshotFoto = JSON.parse(JSON.stringify(formaSelecionadaFoto));
+          telaFoto(lado).setPointerCapture(e.pointerId);
+          return;
+        }
+      }
+    }
+    for(let i = foto.anotacoes.length - 1; i >= 0; i--){
+      if(distanciaFormaPx(foto.anotacoes[i], p, W, H) <= TOLERANCIA_SELECAO){
+        formaSelecionadaFoto = foto.anotacoes[i];
+        ladoSelecionadoFoto = lado;
+        alcaArrastandoFoto = null;
+        arrastarInicioFoto = p;
+        formaInicioSnapshotFoto = JSON.parse(JSON.stringify(foto.anotacoes[i]));
+        telaFoto(lado).setPointerCapture(e.pointerId);
+        return;
+      }
+    }
+    formaSelecionadaFoto = null;
+    ladoSelecionadoFoto = null;
+    alcaArrastandoFoto = null;
+  }
+  function moverSelecaoOuArrastoFoto(e, lado){
+    if(!formaSelecionadaFoto || ladoSelecionadoFoto !== lado || !arrastarInicioFoto) return;
+    const p = posicaoFoto(e, lado);
+    aplicarArrastoGenerico(formaSelecionadaFoto, formaInicioSnapshotFoto, alcaArrastandoFoto, p.x-arrastarInicioFoto.x, p.y-arrastarInicioFoto.y);
+  }
+  function finalizarSelecaoOuArrastoFoto(){
+    arrastarInicioFoto = null;
+    formaInicioSnapshotFoto = null;
+    alcaArrastandoFoto = null;
+  }
+
+  telaFotoA.addEventListener('pointerdown', e => iniciarDesenhoFoto(e, 'A'));
+  telaFotoB.addEventListener('pointerdown', e => iniciarDesenhoFoto(e, 'B'));
+  telaFotoA.addEventListener('pointermove', e => moverDesenhoFoto(e, 'A'));
+  telaFotoB.addEventListener('pointermove', e => moverDesenhoFoto(e, 'B'));
+  telaFotoA.addEventListener('pointerup', () => finalizarDesenhoFoto('A'));
+  telaFotoB.addEventListener('pointerup', () => finalizarDesenhoFoto('B'));
+  // Duplo clique num texto existente com "Mover" selecionado reabre pra editar
+  function dblclickTextoFoto(e, lado){
+    if(ferramenta !== 'mao') return;
+    const foto = fotoAtual(lado);
+    if(!foto) return;
+    const W = telaWFoto(lado), H = telaHFoto(lado);
+    const p = posicaoFoto(e, lado);
+    for(let i = foto.anotacoes.length - 1; i >= 0; i--){
+      const f = foto.anotacoes[i];
+      if(f.tipo === 'texto' && distanciaFormaPx(f, p, W, H) <= TOLERANCIA_SELECAO){
+        abrirEdicaoTexto(e.clientX, e.clientY, f.cor, f.texto, valor => {
+          if(valor) f.texto = valor;
+          else foto.anotacoes.splice(foto.anotacoes.indexOf(f), 1);
+        });
+        return;
+      }
+    }
+  }
+  telaFotoA.addEventListener('dblclick', e => dblclickTextoFoto(e, 'A'));
+  telaFotoB.addEventListener('dblclick', e => dblclickTextoFoto(e, 'B'));
+
+  // Apontador tipo laser por painel: roda em paralelo ao desenho normal
+  telaFotoA.addEventListener('pointermove', e => {
+    if(!apontadorAtivo || !fotoAtual('A')) return;
+    registrarPontoApontador(trilhaApontadorFotoA, posicaoFoto(e, 'A'));
+  });
+  telaFotoB.addEventListener('pointermove', e => {
+    if(!apontadorAtivo || !fotoAtual('B')) return;
+    registrarPontoApontador(trilhaApontadorFotoB, posicaoFoto(e, 'B'));
+  });
+  telaFotoA.addEventListener('pointerleave', () => { trilhaApontadorFotoA = []; });
+  telaFotoB.addEventListener('pointerleave', () => { trilhaApontadorFotoB = []; });
+
+  function mostrarDicaFoto(t){ dicaFoto.textContent = t; dicaFoto.classList.add('visivel'); }
+  function esconderDicaFoto(){ dicaFoto.classList.remove('visivel'); }
+
+  // ---- Print no modo Fotos: reaproveita salvarImagem()/dispararFlash() como
+  // os outros dois modos. Se as duas fotos estiverem carregadas, exporta lado
+  // a lado (igual ao "ambas" do modo 2 câmeras); se só um lado tiver foto,
+  // exporta só aquela — não faz sentido desenhar um painel vazio na imagem.
+  function capturarQuadroAtualFoto(){
+    const fA = fotoAtual('A'), fB = fotoAtual('B');
+    if(!fA && !fB) return null;
+    const c = document.createElement('canvas');
+    const cx = c.getContext('2d');
+
+    function desenharLado(lado, imgEl, xOffset, W, H, escala){
+      const zf = zoomFoto[lado];
+      if(zf.z > 1){
+        const sw = W/zf.z, sh = H/zf.z;
+        const sx = zf.lx*W, sy = zf.ly*H;
+        cx.setTransform(1,0,0,1,xOffset,0);
+        cx.drawImage(imgEl, sx, sy, sw, sh, 0, 0, W, H);
+        cx.setTransform(zf.z, 0, 0, zf.z, xOffset - sx*zf.z, -sy*zf.z);
+        desenharTudoFoto(cx, W, H, escala, lado, false);
+      } else {
+        cx.setTransform(1,0,0,1,xOffset,0);
+        cx.drawImage(imgEl, 0, 0, W, H);
+        desenharTudoFoto(cx, W, H, escala, lado, false);
+      }
+      cx.setTransform(1,0,0,1,0,0);
+    }
+
+    if(fA && fB){
+      const WA = fotoImgA.naturalWidth || 1280, HA = fotoImgA.naturalHeight || 720;
+      const WB = fotoImgB.naturalWidth || 1280, HB = fotoImgB.naturalHeight || 720;
+      c.width = WA + WB; c.height = Math.max(HA, HB);
+      cx.fillStyle = '#000'; cx.fillRect(0, 0, c.width, c.height);
+      desenharLado('A', fotoImgA, 0, WA, HA, WA / telaWFotoA);
+      desenharLado('B', fotoImgB, WA, WB, HB, WB / telaWFotoB);
+    } else {
+      const lado = fA ? 'A' : 'B';
+      const imgEl = fA ? fotoImgA : fotoImgB;
+      const W = imgEl.naturalWidth || 1280, H = imgEl.naturalHeight || 720;
+      c.width = W; c.height = H;
+      desenharLado(lado, imgEl, 0, W, H, W / telaWFoto(lado));
+    }
+    return c;
+  }
+
+  // ---- Alternar entre os 3 modos (1 câmera / 2 câmeras / Fotos) ----
+  // Antes disso era um TOGGLE binário (alternarModo2Cam), o que fazia sentido
+  // só com 2 modos possíveis. Com 3 modos, cada botão do cabeçalho chama esta
+  // função diretamente com o modo que ele representa — nada de "inverter o
+  // estado atual", já que agora não existe um único "outro" modo.
+  function entrarModo(novoModo){
+    if(novoModo === modoAtual) return; // já está nesse modo: nada a fazer
     if(emGravacao || preparandoRec){
       mostrarDica('Pare a gravação antes de trocar de modo');
       mostrarDicaDuo('Pare a gravação antes de trocar de modo');
       setTimeout(() => { esconderDica(); esconderDicaDuo(); }, 2200);
       return;
     }
-    video.pause(); videoA.pause(); videoB.pause();
-    modoAtual = modoAtual === '1cam' ? '2cam' : '1cam';
-    const duo = modoAtual === '2cam';
-    envoltorio1Cam.style.display = duo ? 'none' : '';
-    duoEnvoltorio.style.display = duo ? '' : 'none';
-    btnModo2Cam.classList.toggle('ativo', duo);
-    txtModo2Cam.textContent = duo ? '1 câmera' : '2 câmeras';
-    btnModo2Cam.title = duo ? 'Voltar para a análise de 1 câmera' : 'Comparar duas câmeras do mesmo golpe lado a lado';
-    btnTrocarVideoHeader.style.display = duo ? 'none' : '';
+    video.pause(); videoA.pause(); videoB.pause(); // fotos não tocam, então não há o que pausar nelas
+    modoAtual = novoModo;
+
+    envoltorio1Cam.style.display = novoModo === '1cam' ? '' : 'none';
+    duoEnvoltorio.style.display = novoModo === '2cam' ? '' : 'none';
+    fotoEnvoltorio.style.display = novoModo === 'foto' ? '' : 'none';
+
+    btnModo1Cam.classList.toggle('ativo', novoModo === '1cam');
+    btnModo2Cam.classList.toggle('ativo', novoModo === '2cam');
+    btnModoFoto.classList.toggle('ativo', novoModo === 'foto');
+
+    // "Trocar vídeo" só existe no modo 1 câmera (no 2 câmeras cada painel tem
+    // seu próprio botão de trocar, e no Fotos é "adicionar fotos" por painel).
+    // "Gravar" grava vídeo com narração contínua — não existe isso sobre uma
+    // foto parada, então some do cabeçalho nesse modo.
+    btnTrocarVideoHeader.style.display = novoModo === '1cam' ? '' : 'none';
+    btnGravar.style.display = novoModo === 'foto' ? 'none' : '';
+
+    // Marca o <body> pra CSS poder desativar visualmente a ferramenta Rastro
+    // (ver .foto-modo no <style>) — ela é inerentemente de vídeo (anima os
+    // pontos aparecendo/sumindo conforme o tempo do vídeo passa).
+    document.body.classList.toggle('foto-modo', novoModo === 'foto');
+    // Se o coach estava com Rastro selecionado antes de entrar no modo Fotos,
+    // volta pra "Mover" — deixá-lo preso numa ferramenta agora inacessível
+    // (bloqueada por CSS) seria pior do que trocar por ele.
+    if(novoModo === 'foto' && ferramenta === 'rastro'){
+      document.querySelector('[data-fer="mao"]').click();
+    }
+
     atualizarRotuloSessao();
-    setTimeout(() => { ajustarTela(); ajustarTelaDuo(); }, 60);
+    setTimeout(() => { ajustarTela(); ajustarTelaDuo(); ajustarTelaFoto('A'); ajustarTelaFoto('B'); }, 60);
   }
-  btnModo2Cam.addEventListener('click', alternarModo2Cam);
+  btnModo1Cam.addEventListener('click', () => entrarModo('1cam'));
+  btnModo2Cam.addEventListener('click', () => entrarModo('2cam'));
+  btnModoFoto.addEventListener('click', () => entrarModo('foto'));
 
   // ---------- Atalhos ----------
   document.addEventListener('keydown', e => {
     if((e.target.tagName === 'INPUT' && e.target.type !== 'range') || e.target.tagName === 'TEXTAREA') return;
     const k = e.key.toLowerCase();
-    if(e.code === 'Space'){ e.preventDefault(); modoAtual === '2cam' ? alternarPlayDuo() : alternarPlay(); }
-    else if(e.key === 'ArrowLeft'){ e.preventDefault(); modoAtual === '2cam' ? passoQuadroDuo(-1) : passoQuadro(-1); }
-    else if(e.key === 'ArrowRight'){ e.preventDefault(); modoAtual === '2cam' ? passoQuadroDuo(1) : passoQuadro(1); }
+    // Espaço (play/pause) não faz sentido no modo Fotos — não há vídeo pra
+    // tocar sobre uma imagem parada, então fica de propósito sem ação.
+    if(e.code === 'Space'){
+      e.preventDefault();
+      if(modoAtual === '2cam') alternarPlayDuo();
+      else if(modoAtual !== 'foto') alternarPlay();
+    }
+    // ←/→ no modo Fotos são reaproveitadas pra navegar o ÁLBUM (foto
+    // anterior/próxima) em vez de avançar quadro de vídeo — como não há duas
+    // barras de tempo aqui, escolhemos navegar o painel que o mouse tocou
+    // por último (ladoHoverFoto), caindo em "A" por padrão se o coach ainda
+    // não passou o mouse sobre nenhum dos dois.
+    else if(e.key === 'ArrowLeft'){
+      e.preventDefault();
+      if(modoAtual === '2cam') passoQuadroDuo(-1);
+      else if(modoAtual === 'foto') navegarAlbum(ladoHoverFoto, -1);
+      else passoQuadro(-1);
+    }
+    else if(e.key === 'ArrowRight'){
+      e.preventDefault();
+      if(modoAtual === '2cam') passoQuadroDuo(1);
+      else if(modoAtual === 'foto') navegarAlbum(ladoHoverFoto, 1);
+      else passoQuadro(1);
+    }
     else if(k === 'f') alternarTelaCheia();
     else if(k === 'h') alternarModoLimpo();
     else if(k === 'x') limpar();
-    else if(k === 'r'){ e.preventDefault(); if(!e.repeat) btnGravar.click(); }
+    // Gravar narração sobre uma foto parada não faz sentido — o botão fica
+    // oculto no cabeçalho nesse modo (ver entrarModo), e aqui a tecla vira
+    // no-op pelo mesmo motivo.
+    else if(k === 'r'){ e.preventDefault(); if(!e.repeat && modoAtual !== 'foto') btnGravar.click(); }
     else if(k === 'i'){ e.preventDefault(); if(!e.repeat) btnPrint.click(); }
     else if((e.ctrlKey || e.metaKey) && k === 'z'){ e.preventDefault(); desfazer(); }
     else if(k === 'v') selecionarFer('mao');
@@ -2621,15 +3586,28 @@
           if(idx >= 0) arr.splice(idx, 1);
           formaSelecionadaDuo = null; camSelecionadaDuo = null;
         }
+      } else if(modoAtual === 'foto'){
+        if(formaSelecionadaFoto && ladoSelecionadoFoto){
+          const foto = fotoAtual(ladoSelecionadoFoto);
+          if(foto){
+            const idx = foto.anotacoes.indexOf(formaSelecionadaFoto);
+            if(idx >= 0) foto.anotacoes.splice(idx, 1);
+          }
+          formaSelecionadaFoto = null; ladoSelecionadoFoto = null;
+        }
       } else if(formaSelecionada){
         const idx = anotacoes.indexOf(formaSelecionada);
         if(idx >= 0) anotacoes.splice(idx, 1);
         formaSelecionada = null;
       }
     }
-    else if(e.key === 'Escape'){ zerarZoom(); zerarZoomDuo(); }
+    else if(e.key === 'Escape'){ zerarZoom(); zerarZoomDuo(); zerarZoomFoto('A'); zerarZoomFoto('B'); }
   });
   function selecionarFer(nome){
+    // Rastro é uma ferramenta só de vídeo (ver .foto-modo no <style>): o
+    // atalho de teclado 'B' também precisa respeitar essa regra, já que o
+    // bloqueio por CSS (pointer-events:none) só impede o CLIQUE no botão.
+    if(modoAtual === 'foto' && nome === 'rastro') return;
     const b = document.querySelector(`[data-fer="${nome}"]`);
     if(b) b.click();
   }
