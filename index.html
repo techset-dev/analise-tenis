@@ -1535,6 +1535,7 @@
   let gravador = null, pedacos = [], canvasRec = null, ctxRec = null;
   let audioCtx = null, fonteVideo = null, micStream = null, micGain = null;
   let fonteVideoA = null, fonteVideoB = null; // fontes de áudio dos vídeos no modo 2 câmeras (só podem ser criadas uma vez por vídeo)
+  let telaStream = null; // captura de tela (getDisplayMedia), usada só na gravação com uma câmera de link — é o jeito permitido de pegar o conteúdo de um iframe cross-origin
 
   // ---- Mixer de áudio ----
   // Volume do vídeo: mexe direto no player, então vale para a escuta E para a
@@ -1883,14 +1884,57 @@
     setTimeout(esconderDica, 3500);
   }
 
+  // Monta o MediaRecorder em cima de um fluxo (vídeo + áudio) já pronto e
+  // cuida de tudo que é igual nos dois jeitos de gravar (canvas ou tela):
+  // escolher o melhor mimeType disponível, plugar os eventos, ligar o
+  // cronômetro e atualizar os botões. `msgGravacao` é o aviso mostrado ao
+  // coach logo que a gravação começa.
+  function iniciarMediaRecorder(fluxo, msgGravacao){
+    const candidatos = [
+      { mime:'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext:'mp4' },
+      { mime:'video/mp4;codecs=avc1,mp4a.40.2',        ext:'mp4' },
+      { mime:'video/mp4',                              ext:'mp4' },
+      { mime:'video/webm;codecs=vp9,opus',             ext:'webm' },
+      { mime:'video/webm;codecs=vp8,opus',             ext:'webm' },
+      { mime:'video/webm',                             ext:'webm' }
+    ];
+    const escolhido = candidatos.find(c => MediaRecorder.isTypeSupported(c.mime)) || candidatos[candidatos.length-1];
+    extensao = escolhido.ext;
+    pedacos = [];
+    gravador = new MediaRecorder(fluxo, { mimeType:escolhido.mime, videoBitsPerSecond: 8_000_000 });
+    gravador.ondataavailable = e => { if(e.data.size) pedacos.push(e.data); };
+    gravador.onstop = salvarGravacao;
+    gravador.onerror = () => {
+      avisar('Ocorreu um erro na gravação. Tente novamente; se persistir, atualize o Chrome/Edge.');
+      pararGravacao();
+    };
+    gravador.start();
+    emGravacao = true;
+    preparandoRec = false;
+
+    btnGravar.classList.add('gravando');
+    txtGravar.textContent = 'Parar (R)';
+    inicioRec = Date.now();
+    timerRec = setInterval(() => {
+      const s = Math.floor((Date.now()-inicioRec)/1000);
+      tempoRec.textContent = '● ' + String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+    }, 500);
+    mostrarDicaDuo(msgGravacao);
+    setTimeout(esconderDicaDuo, 3500);
+  }
+
   // Gravação do modo 2 câmeras: monta um canvas com as duas câmeras lado a
   // lado (cada uma na sua resolução nativa), com as anotações de cada uma
   // desenhadas na sua própria metade, e mistura o microfone com o áudio dos vídeos.
+  // Com uma câmera de link envolvida, usa captura de tela em vez de canvas
+  // (ver o bloco linkModo mais abaixo).
   async function iniciarGravacaoDuo(){
     // Uma câmera carregada por link é um iframe cross-origin: não dá (nem
-    // deveria dar) pra capturar os pixels dela numa gravação. Com um link
-    // envolvido, a gravação vira "estilo 1 câmera", só da câmera que for
-    // vídeo de verdade; com as duas sendo link, não há nada pra gravar.
+    // deveria dar) pra capturar os pixels dela desenhando num canvas. Com as
+    // duas sendo link, não há nada pra gravar (nenhum vídeo de verdade na
+    // tela); com só uma sendo link, gravamos com captura de tela (mais
+    // abaixo) em vez de canvas, pra pegar as duas câmeras juntas do jeito
+    // que o coach está vendo.
     if(linkAtivoA && linkAtivoB){
       mostrarDicaDuo('Não é possível gravar um vídeo carregado por link — isso só funciona com vídeos carregados como arquivo');
       setTimeout(esconderDicaDuo, 3200);
@@ -1917,15 +1961,103 @@
       return;
     }
 
+    // ------------------------------------------------------------
+    // Modo link: em vez de desenhar frames num canvas (impossível com um
+    // iframe cross-origin no meio), pedimos ao próprio navegador pra
+    // capturar a aba inteira (getDisplayMedia) — é o mesmo mecanismo que
+    // Zoom/Meet usam pra compartilhar tela, e por não "ler pixels" via DOM
+    // ele não esbarra na restrição de cross-origin. O coach vê o prompt
+    // nativo do navegador ("Compartilhar esta aba?") e precisa confirmar
+    // manualmente — isso é esperado e não dá pra pular.
+    // ------------------------------------------------------------
+    if(linkModo){
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
+        preparandoRec = false;
+        if(micStream) micStream.getTracks().forEach(t => t.stop());
+        mostrarDicaDuo('Seu navegador não suporta captura de tela — não dá pra gravar as duas câmeras com um vídeo de referência por link');
+        setTimeout(esconderDicaDuo, 3500);
+        return;
+      }
+      try{
+        telaStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: 'browser', frameRate: 30 },
+          audio: true,
+          preferCurrentTab: true
+        });
+      }catch(err){
+        preparandoRec = false;
+        if(micStream) micStream.getTracks().forEach(t => t.stop());
+        mostrarDicaDuo('Gravação cancelada — é preciso permitir o compartilhamento da aba pra gravar com um vídeo de referência por link');
+        setTimeout(esconderDicaDuo, 3500);
+        return;
+      }
+
+      // Mesma mixagem de sempre (microfone + áudio da câmera real), com um
+      // ingrediente a mais: o áudio da própria aba compartilhada, se o
+      // coach tiver marcado "compartilhar áudio" no diálogo do navegador
+      // (é o som do vídeo de referência tocando).
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if(audioCtx.state === 'suspended') await audioCtx.resume();
+      const destino = audioCtx.createMediaStreamDestination();
+      const mic = audioCtx.createMediaStreamSource(micStream);
+      micGain = audioCtx.createGain();
+      micGain.gain.value = duoVolMic.value / 100;
+      mic.connect(micGain);
+      micGain.connect(destino);
+      if(!linkAtivoA){
+        try{
+          if(!fonteVideoA){
+            fonteVideoA = audioCtx.createMediaElementSource(videoA);
+            fonteVideoA.connect(audioCtx.destination);
+          }
+          fonteVideoA.connect(destino);
+        }catch(e){ /* alguns navegadores bloqueiam; segue sem esse áudio */ }
+      }
+      if(!linkAtivoB && !videoB.muted){
+        try{
+          if(!fonteVideoB){
+            fonteVideoB = audioCtx.createMediaElementSource(videoB);
+            fonteVideoB.connect(audioCtx.destination);
+          }
+          fonteVideoB.connect(destino);
+        }catch(e){ /* idem */ }
+      }
+      if(telaStream.getAudioTracks().length){
+        try{
+          const fonteTela = audioCtx.createMediaStreamSource(telaStream);
+          fonteTela.connect(destino);
+        }catch(e){ /* navegador não liberou o áudio da aba; segue só com mic + câmera real */ }
+      }
+
+      const fluxo = new MediaStream([
+        ...telaStream.getVideoTracks(),
+        ...destino.stream.getAudioTracks()
+      ]);
+
+      // Se o coach parar o compartilhamento pelo controle do PRÓPRIO
+      // navegador (a barrinha "Parar compartilhamento"), em vez do botão
+      // "Parar" do app, a gravação precisa finalizar e salvar do mesmo
+      // jeito — senão fica "pendurada" achando que ainda está gravando.
+      telaStream.getVideoTracks()[0].addEventListener('ended', () => {
+        if(emGravacao) pararGravacao();
+      });
+
+      const dicaModoLimpo = document.body.classList.contains('limpo')
+        ? ''
+        : ' — dica: aperte H antes de gravar pra esconder os painéis';
+      iniciarMediaRecorder(fluxo, 'Gravando a tela com narração — inclui o vídeo de referência' + dicaModoLimpo);
+      return;
+    }
+
     // Canvas composto: no layout "lado a lado" as duas câmeras ficam uma do
     // lado da outra, cada uma na própria resolução nativa; nos layouts "só
     // A"/"só B" a gravação captura apenas a câmera visível, em tela cheia —
-    // a gravação sempre acompanha o que está sendo mostrado na tela. Com um
-    // link envolvido, força o layout efetivo pra "só a câmera real": o outro
-    // lado não tem pixels pra desenhar de qualquer forma.
+    // a gravação sempre acompanha o que está sendo mostrado na tela. Esse
+    // caminho só roda com as duas câmeras sendo vídeo de verdade (o modo
+    // link já foi tratado e encerrado a função acima).
     const WA = videoA.videoWidth || 1280, HA = videoA.videoHeight || 720;
     const WB = videoB.videoWidth || 1280, HB = videoB.videoHeight || 720;
-    const layoutEfetivo = linkModo ? camReal : layoutDuo;
+    const layoutEfetivo = layoutDuo;
     let W, H;
     if(layoutEfetivo === 'A'){ W = WA; H = HA; }
     else if(layoutEfetivo === 'B'){ W = WB; H = HB; }
@@ -2011,44 +2143,12 @@
       ...canvasRec.captureStream(30).getVideoTracks(),
       ...destino.stream.getAudioTracks()
     ]);
-    const candidatos = [
-      { mime:'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext:'mp4' },
-      { mime:'video/mp4;codecs=avc1,mp4a.40.2',        ext:'mp4' },
-      { mime:'video/mp4',                              ext:'mp4' },
-      { mime:'video/webm;codecs=vp9,opus',             ext:'webm' },
-      { mime:'video/webm;codecs=vp8,opus',             ext:'webm' },
-      { mime:'video/webm',                             ext:'webm' }
-    ];
-    const escolhido = candidatos.find(c => MediaRecorder.isTypeSupported(c.mime)) || candidatos[candidatos.length-1];
-    extensao = escolhido.ext;
-    pedacos = [];
-    gravador = new MediaRecorder(fluxo, { mimeType:escolhido.mime, videoBitsPerSecond: 8_000_000 });
-    gravador.ondataavailable = e => { if(e.data.size) pedacos.push(e.data); };
-    gravador.onstop = salvarGravacao;
-    gravador.onerror = () => {
-      avisar('Ocorreu um erro na gravação. Tente novamente; se persistir, atualize o Chrome/Edge.');
-      pararGravacao();
-    };
-    gravador.start();
-    emGravacao = true;
-    preparandoRec = false;
-
-    btnGravar.classList.add('gravando');
-    txtGravar.textContent = 'Parar (R)';
-    inicioRec = Date.now();
-    timerRec = setInterval(() => {
-      const s = Math.floor((Date.now()-inicioRec)/1000);
-      tempoRec.textContent = '● ' + String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
-    }, 500);
-    const msgGravacao = linkModo
-      ? 'Gravando só a Câmera ' + camReal + ' com narração — a câmera carregada por link não entra na gravação'
-      : layoutEfetivo === 'A'
-        ? 'Gravando a Câmera A com narração'
-        : layoutEfetivo === 'B'
-          ? 'Gravando a Câmera B com narração'
-          : 'Gravando as duas câmeras com narração — a gravação junta as duas lado a lado, sem os painéis';
-    mostrarDicaDuo(msgGravacao);
-    setTimeout(esconderDicaDuo, 3500);
+    const msgGravacao = layoutEfetivo === 'A'
+      ? 'Gravando a Câmera A com narração'
+      : layoutEfetivo === 'B'
+        ? 'Gravando a Câmera B com narração'
+        : 'Gravando as duas câmeras com narração — a gravação junta as duas lado a lado, sem os painéis';
+    iniciarMediaRecorder(fluxo, msgGravacao);
   }
 
   function nomeArquivoGravacao(){
@@ -2071,6 +2171,8 @@
     if(gravador && gravador.state === 'recording') gravador.stop();
     if(animRec) cancelAnimationFrame(animRec);
     if(micStream) micStream.getTracks().forEach(t => t.stop());
+    if(telaStream) telaStream.getTracks().forEach(t => t.stop()); // encerra a captura de tela (modo link), se estava ativa
+    telaStream = null;
     clearInterval(timerRec);
     tempoRec.textContent = '';
     btnGravar.classList.remove('gravando');
